@@ -8,6 +8,45 @@
         android:id="@+id/mapView"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent" />
+    <ImageButton
+        android:id="@+id/locationButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignRight="@id/mapView"
+        android:layout_alignParentBottom="false"
+        android:layout_centerHorizontal="false"
+        android:layout_centerVertical="true"
+        android:layout_marginBottom="4dp"
+        android:scaleX="0.6"
+        android:scaleY="0.6"
+        android:background="@color/red"
+        android:src="@drawable/ic_action_location_2" />
+    <ImageButton
+        android:id="@+id/searchButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@id/mapView"
+        android:layout_alignParentBottom="false"
+        android:layout_centerHorizontal="false"
+        android:layout_centerVertical="true"
+        android:layout_marginBottom="4dp"
+        android:scaleX="0.6"
+        android:scaleY="0.6"
+        android:background="@color/translucent"
+        android:src="@drawable/ic_action_search" />
+    <ImageButton
+        android:id="@+id/displayButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@id/mapView"
+        android:layout_alignParentBottom="false"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="false"
+        android:layout_marginBottom="4dp"
+        android:scaleX="0.6"
+        android:scaleY="0.6"
+        android:background="@color/translucent"
+        android:src="@drawable/ic_action_sun" />
 
 </RelativeLayout>
     <!--android:tint="@android:color/red"-->

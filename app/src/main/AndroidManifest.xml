@@ -13,7 +13,7 @@
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
-
+    <uses-feature android:name="android.hardware.type.watch" />
     <uses-sdk
         android:minSdkVersion="30"
         android:targetSdkVersion="30" />
@@ -25,17 +25,17 @@
         android:requestLegacyExternalStorage="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
-        <!--<uses-library
+        <uses-library
             android:name="com.google.android.wearable"
-            android:required="true" />-->
+            android:required="true" />
 
         <!--
                Set to true if your app is Standalone, that is, it does not require the handheld
                app to run.
         -->
-        <!--<meta-data
+        <meta-data
             android:name="com.google.android.wearable.standalone"
-            android:value="true" />-->
+            android:value="true" />
 
         <activity
             android:name=".MainActivity"
@@ -44,22 +44,7 @@
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
-                <!--
-                Support URIs like "mapsforgesamples://?activity=DefaultTheme&mapdir=/path/to/my/maps&mapfile=my.map".
-                Provide custom defaults for SamplesBaseActivity and/or directly jump into an activity.
-                Serves as a substitute for command line arguments for easy launches during development.
-                If it does not work, check if your IDE (or other tooling) requires you escape the & characters as \&.
-                -->
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.BROWSABLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:scheme="mapsforgesamples" />
             </intent-filter>
         </activity>
     </application>

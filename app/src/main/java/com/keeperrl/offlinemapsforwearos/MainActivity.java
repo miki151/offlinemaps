@@ -112,80 +112,690 @@ import org.mapsforge.map.rendertheme.XmlRenderThemeStyleMenu;
  * The simplest form of creating a map viewer based on the MapViewerTemplate.
  * It also demonstrates the use simplified cleanup operation at activity exit.
  */
-public class MainActivity extends MapViewerTemplate {
-    /**
-     * This MapViewer uses the built-in default theme.
-     *
-     * @return the render theme to use
-     */
+public class MainActivity extends Activity implements LocationListener {
+
+    protected MapView mapView;
+    protected List<TileCache> tileCaches = new ArrayList<TileCache>();
+
     @Override
-    protected XmlRenderTheme getRenderTheme() {
-        return InternalRenderTheme.DEFAULT;
+    public boolean onGenericMotionEvent(MotionEvent ev) {
+        Log.i("mapsforge", "Generic motion " + ev.toString());
+        if (ev.getAction() == MotionEvent.ACTION_SCROLL &&
+                ev.isFromSource(InputDeviceCompat.SOURCE_ROTARY_ENCODER)
+        ) {
+            Log.i("mapsforge", "Rotary motion " + ev.toString());
+            // Don't forget the negation here
+            if (ev.getAxisValue(MotionEventCompat.AXIS_SCROLL) < 0)
+                mapView.getModel().mapViewPosition.zoomIn(false);
+            else if (ev.getAxisValue(MotionEventCompat.AXIS_SCROLL) > 0)
+                mapView.getModel().mapViewPosition.zoomOut(false);
+
+            return true;
+        }
+        return false;
     }
 
-    /**
-     * This MapViewer uses the standard xml layout in the Samples app.
-     */
-    @Override
-    protected int getLayoutId() {
-        return R.layout.mapviewer;
+    private static Paint getPaint(int color, int strokeWidth, Style style) {
+        Paint paint = AndroidGraphicFactory.INSTANCE.createPaint();
+        paint.setColor(color);
+        paint.setStrokeWidth(strokeWidth);
+        paint.setStyle(style);
+        return paint;
     }
 
-    /**
-     * The id of the mapview inside the layout.
-     *
-     * @return the id of the MapView inside the layout.
-     */
-    @Override
-    protected int getMapViewId() {
-        return R.id.mapView;
+    private LocationManager locationManager;
+    private MyLocationOverlay myLocationOverlay;
+    private Location lastLocation = null;
+
+    private void setLocation(Location location) {
+        this.mapView.setCenter(new LatLong(location.getLatitude(), location.getLongitude()));
     }
 
-    /**
-     * The name of the map file.
-     *
-     * @return map file name
-     */
     @Override
-    protected String getMapFileName() {
-        return "berlin.map";
+    public void onLocationChanged(Location location) {
+        this.myLocationOverlay.setPosition(location.getLatitude(), location.getLongitude(), location.getAccuracy());
+        lastLocation = location;
+        ImageButton button = (ImageButton) findViewById(R.id.locationButton);
+        if (lockedLocation) {
+            setLocation(location);
+            button.setBackgroundColor(getResources().getColor(R.color.blue));
+        } else
+            button.setBackgroundColor(getResources().getColor(R.color.translucent));
     }
 
-    /**
-     * Creates a simple tile renderer layer with the AndroidUtil helper.
-     */
-    @Override
-    protected void createLayers() {
-        TileRendererLayer tileRendererLayer = AndroidUtil.createTileRendererLayer(this.tileCaches.get(0),
-                this.mapView.getModel().mapViewPosition, getMapFile(), getRenderTheme(), false, true, false);
+    private boolean lockedLocation = false;
+    private boolean displayOn = false;
+
+    protected void createControls() {
+        initializePosition(mapView.getModel().mapViewPosition);
+        ImageButton locationButton = (ImageButton) findViewById(R.id.locationButton);
+        locationButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lockedLocation = true;
+                if (lastLocation != null) {
+                    locationButton.setBackgroundColor(getResources().getColor(R.color.blue));
+                    setLocation(lastLocation);
+                }
+            }
+        });
+        ImageButton displayButton = (ImageButton) findViewById(R.id.displayButton);
+        displayButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!displayOn) {
+                    getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    displayButton.setBackgroundColor(getResources().getColor(R.color.blue));
+                } else {
+                    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    displayButton.setBackgroundColor(getResources().getColor(R.color.translucent));
+                }
+                displayOn = !displayOn;
+            }
+        });
+        ImageButton searchButton = (ImageButton) findViewById(R.id.searchButton);
+        searchButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                searchAction();
+            }
+        });
+    }
+
+    void popupMenu() {
+        LayoutInflater layoutInflater =
+                (LayoutInflater)getBaseContext()
+                        .getSystemService(LAYOUT_INFLATER_SERVICE);
+        View popupView = layoutInflater.inflate(R.layout.categorypopup, null);
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        String[] elems = new String[]{"Find address", "Show POIs", "Download maps", "Settings"};
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(MainActivity.this,
+                        R.layout.categoryelem, elems);
+        listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                switch (i) {
+                    case 0:
+                        streetAction();
+                        break;
+                    case 1:
+                        searchAction();
+                        break;
+                    case 2:
+                        downloadMapsAction();
+                        break;
+                    case 3:
+                        break;
+                    default:
+                        throw new RuntimeException("Unknown menu item: " + Integer.toString(i));
+
+                }
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+    }
+
+    File getMapPath(String name) {
+        return new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), name + ".map");
+    }
+
+    final String[] allMaps = new String[]{"sweden", "poland", "kosovo", "andorra"};
+    StringBuffer[] labels = null;
+    ArrayAdapter mapDownloadsAdapter;
+    HashMap<String, Long> fetching;
+    Set<String> ready;
+
+    void downloadMapsAction() {
+        LayoutInflater layoutInflater =
+                (LayoutInflater)getBaseContext()
+                        .getSystemService(LAYOUT_INFLATER_SERVICE);
+        View popupView = layoutInflater.inflate(R.layout.categorypopup, null);
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView,  WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        DownloadManager.Query q = new DownloadManager.Query();
+        q.setFilterByStatus(DownloadManager.STATUS_RUNNING);
+        labels = new StringBuffer[allMaps.length];
+        for (int i = 0; i < allMaps.length; ++i)
+            labels[i] = new StringBuffer(allMaps[i]);
+        List<String> uris = new ArrayList<String>();
+        ready = new HashSet<String>();
+        fetching = new HashMap<String, Long>();
+        for (int i = 0; i < allMaps.length; ++i) {
+            Log.i("mapsforge", "Checking " + getMapPath(allMaps[i]).getAbsolutePath());
+            if (getMapPath(allMaps[i]).exists()) {
+                ready.add(allMaps[i]);
+                labels[i].append("[Ready]");
+            }
+            uris.add("http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/" + allMaps[i] + ".map");
+        }
+        DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+        Cursor cursor = downloadManager.query(q);
+        if (cursor.moveToFirst()) {
+            do {
+                String uri = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_URI));
+                String path = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
+                long id = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_ID));
+                for (int i = 0; i < uris.size(); ++i)
+                    if (uris.get(i).equals(uri)) {
+                        Log.i("mapsforge", "Fetching " + allMaps[i] + " to " + path);
+                        labels[i].replace(0, 100000, allMaps[i] + " [Fetching]");
+                        fetching.put(allMaps[i], id);
+                    }
+            } while (cursor.moveToNext());
+        }
+        mapDownloadsAdapter = new ArrayAdapter<StringBuffer>(MainActivity.this,
+                R.layout.categoryelem, labels);
+        listView.setAdapter(mapDownloadsAdapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                if (fetching.containsKey(allMaps[i])) {
+                    Intent intent = new Intent();
+                    intent.setAction(DownloadManager.ACTION_VIEW_DOWNLOADS);
+                    startActivity(intent);
+                } else
+                if (ready.contains(allMaps[i])) {
+                    downloadedMapMenu(i);
+                } else {
+                    downloadMap(allMaps[i], uris.get(i));
+                    if (labels == null)
+                        Log.i("mapsforge", "NULL");
+                    labels[i].replace(0, 100000, allMaps[i] + " [Fetching]");
+                    mapDownloadsAdapter.notifyDataSetChanged();
+                }
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+    }
+
+    void downloadedMapMenu(int mapIndex) {
+        String name = allMaps[mapIndex];
+        View popupView = ((LayoutInflater)getBaseContext()
+                .getSystemService(LAYOUT_INFLATER_SERVICE)).inflate(R.layout.categorypopup, null);
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        String[] elems = new String[]{"Erase map file"};
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(MainActivity.this,
+                        R.layout.categoryelem, elems);
+        listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int button, long l) {
+                getMapPath(name).delete();
+                ready.remove(name);
+                labels[mapIndex].replace(0, 100000, allMaps[mapIndex]);
+                mapDownloadsAdapter.notifyDataSetChanged();
+                popupWindow.dismiss();
+                reloadLayers();
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+    }
+
+    void downloadMap(String name, String url) {
+        DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+        //Set whether this download may proceed over a roaming connection.
+        request.setAllowedOverRoaming(false);
+        //Set the title of this download, to be displayed in notifications (if enabled).
+        request.setTitle("Cheesecake map download: " + name);
+        //Set a description of this download, to be displayed in notifications (if enabled)
+        request.setDescription("");
+        //Set the local destination for the downloaded file to a path within the application's external files directory
+        File target = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), name + ".map.tmp");
+        if (target.exists())
+            target.delete();
+        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS,name + ".map.tmp");
+        downloadManager.enqueue(request);
+        //Enqueue a new download and same the referenceId
+        //downloadReference = downloadManager.enqueue(request);
+    }
+
+    private BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, 0);
+            Log.i("mapsforge","Checking download status for id: " + downloadId);
+            DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+            Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(downloadId));
+
+            if (cursor.moveToFirst()) {
+                String path = Uri.parse(cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI))).getPath();
+                File file = new File(path);
+                String mapName = file.getName().substring(0, file.getName().length() - 8);
+                int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                if (status == DownloadManager.STATUS_FAILED) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            for (int i = 0; i < allMaps.length; ++i)
+                                if (allMaps[i].equals(mapName)) {
+                                    labels[i].replace(0, 100000, allMaps[i]);
+                                    fetching.remove(allMaps[i]);
+                                    mapDownloadsAdapter.notifyDataSetChanged();
+                                }
+                        }
+                    });
+                }
+                if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                    file.renameTo(new File(path.substring(0, path.length() - 4)));
+                    Log.i("mapsforge", "Downloaded map:" + mapName);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            for (int i = 0; i < allMaps.length; ++i)
+                                if (allMaps[i].equals(mapName)) {
+                                    labels[i].replace(0, 100000, allMaps[i] + " [Ready]");
+                                    fetching.remove(allMaps[i]);
+                                    ready.add(allMaps[i]);
+                                    mapDownloadsAdapter.notifyDataSetChanged();
+                                    reloadLayers();
+                                }
+                        }
+                    });
+                }
+            }
+        }
+    };
+
+    void searchAction() {
+        if (groupLayer != null) {
+            mapView.getLayerManager().getLayers().remove(groupLayer);
+        }
+        LayoutInflater layoutInflater =
+                (LayoutInflater)getBaseContext()
+                        .getSystemService(LAYOUT_INFLATER_SERVICE);
+        View popupView = layoutInflater.inflate(R.layout.categorypopup, null);
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        String[] elems = new String[]{"Food", "Shop", "Health care", "Public Transport", "Sport", "Tourism", "Natural", "Leisure", "Historic", "Emergency", "Playgrounds", "All"};
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(MainActivity.this,
+                        R.layout.categoryelem, elems);
+        listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                mapView.getLayerManager().redrawLayers();
+                // POI search
+                new MainActivity.PoiSearchTask(MainActivity.this, elems[i], false).execute(mapView.getBoundingBox());
+                Log.i("mapsforge", "Selected " + elems[i] + " " + Integer.toString(i) + " " + Long.toString(l));
+                popupWindow.dismiss();
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+    }
+
+    void chooseStreet(String street) {
+        WhitelistPoiCategoryFilter filter = new WhitelistPoiCategoryFilter();
+        try {
+            filter.addCategory(persistenceManager.getCategoryManager().getPoiCategoryByTitle("Address"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        Collection<PointOfInterest> results = persistenceManager.findInRect(mapView.getBoundingBox(), filter, null, Integer.MAX_VALUE);
+        Set<String> streets = new HashSet<String>();
+        for (PointOfInterest poi : results) {
+            for (Tag t : poi.getTags())
+                if (t.key.equals("addr:street"))
+                    streets.add(t.value);
+        }
+        Log.i("mapsforge", Integer.toString(streets.size()) + " results");
+    }
+
+    void streetAction() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Title");
+
+// Set up the input
+        final EditText input = new EditText(this);
+// Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+// Set up the buttons
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                new MainActivity.PoiSearchTask(MainActivity.this, input.getText().toString(), true).execute(mapView.getBoundingBox());
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+        builder.show();
+    }
+
+    private GroupLayer groupLayer;
+    private PoiPersistenceManager persistenceManager;
+
+    File getAssetFile(String path) {
+        try {
+            InputStream stream = getAssets().open(path);
+            File tmp = File.createTempFile("world", "map");
+            byte[] buffer = new byte[1024];
+            int read;
+            OutputStream out = new FileOutputStream(tmp);
+            while ((read = stream.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+            return tmp;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    MapDataStore getDownloadedMaps() {
+        MultiMapDataStore dataStore = new MultiMapDataStore(MultiMapDataStore.DataPolicy.RETURN_FIRST);
+        File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        for (File f : dir.listFiles()) {
+            Log.i("mapsforge", "Found file: " + f.getAbsolutePath());
+            if (f.getName().endsWith(".map")) {
+                MapFile file = new MapFile(f);
+                file.restrictToZoomRange((byte) 6, Byte.MAX_VALUE);
+                dataStore.addMapDataStore(file, false, false);
+                if (Character.isDigit(f.getName().charAt(f.getName().length() - 5)))
+                    f.delete();
+            } else
+                f.delete();
+        }
+        dataStore.addMapDataStore(new MapFile(getAssetFile("mapsforge/world.map")), false, false);
+        return dataStore;
+    }
+
+    void reloadLayers() {
+        this.tileCaches.get(0).purge();
+        MapDataStore mapStore = getDownloadedMaps();
+        TileRendererLayer tileRendererLayer = new TileRendererLayer(tileCaches.get(0), mapStore,
+                mapView.getModel().mapViewPosition, false, false, false, AndroidGraphicFactory.INSTANCE)  {
+            @Override
+            public boolean onLongPress(LatLong tapLatLong, Point layerXY, Point tapXY) {
+                popupMenu();
+                return true;
+            }
+        };
+        tileRendererLayer.setXmlRenderTheme(InternalRenderTheme.DEFAULT);
+        this.mapView.getLayerManager().getLayers().clear(true);
         this.mapView.getLayerManager().getLayers().add(tileRendererLayer);
+        MapDataStoreLabelStore labelStore = new MapDataStoreLabelStore(mapStore, tileRendererLayer.getRenderThemeFuture(),
+                tileRendererLayer.getTextScale(), tileRendererLayer.getDisplayModel(), AndroidGraphicFactory.INSTANCE);
+        LabelLayer labelLayer = new ThreadedLabelLayer(AndroidGraphicFactory.INSTANCE, labelStore);
+        mapView.getLayerManager().getLayers().add(labelLayer);
+        this.mapView.getLayerManager().getLayers().add(this.myLocationOverlay);
     }
 
-    @Override
-    protected void createMapViews() {
-        super.createMapViews();
+    private void createLayers() {
+        Bitmap bitmap = new AndroidBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.ic_maps_indicator_current_position));
+        Marker marker = new Marker(null, bitmap, 0, 0);
+        // circle to show the location accuracy (optional)
+        Circle circle = new Circle(null, 0,
+                getPaint(AndroidGraphicFactory.INSTANCE.createColor(48, 0, 0, 255), 0, Style.FILL),
+                getPaint(AndroidGraphicFactory.INSTANCE.createColor(160, 0, 0, 255), 2, Style.STROKE));
+        this.myLocationOverlay = new MyLocationOverlay(marker, circle);
+        reloadLayers();
+        // create the overlay
+        this.mapView.setBuiltInZoomControls(false);
+        DefaultMapScaleBar scaleBar = new DefaultMapScaleBar(mapView.getModel().mapViewPosition,
+                mapView.getModel().mapViewDimension,
+                AndroidGraphicFactory.INSTANCE, mapView.getModel().displayModel);
+        mapView.setMapScaleBar(scaleBar);
+        scaleBar.setScaleBarPosition(MapScaleBar.ScaleBarPosition.BOTTOM_CENTER);
+        scaleBar.setScaleBarMode(DefaultMapScaleBar.ScaleBarMode.SINGLE);
+        scaleBar.setDistanceUnitAdapter(new MetricUnitAdapter());
+        this.locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        this.locationManager.removeUpdates(this);
+        mapView.addInputListener(new InputListener() {
+            @Override
+            public void onMoveEvent() {
+                lockedLocation = false;
+                if (lastLocation != null) {
+                    ImageButton button = (ImageButton) findViewById(R.id.locationButton);
+                    button.setBackgroundColor(getResources().getColor(R.color.translucent));
+                }
+            }
+            @Override
+            public void onZoomEvent() {
+            }
+        });
+        for (String provider : this.locationManager.getProviders(true)) {
+            if (LocationManager.GPS_PROVIDER.equals(provider)
+                    || LocationManager.NETWORK_PROVIDER.equals(provider)) {
+                this.locationManager.requestLocationUpdates(provider, 0, 0, this);
+            }
+        }
+        try {
+            List<LatLong> track = decodeGPX(getAssets().open("mapsforge/track.gpx"));
+            addTrack(mapView.getLayerManager().getLayers(), track);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        //this.mapView.getModel().displayModel.setFilter(Filter.INVERT);
+        this.mapView.getModel().displayModel.setBackgroundColor(0x000000);
     }
 
-    /**
-     * Creates the tile cache with the AndroidUtil helper
-     */
-    @Override
-    protected void createTileCaches() {
-        this.tileCaches.add(AndroidUtil.createTileCache(this, getPersistableId(),
+    static Paint createPaint(int color, int strokeWidth, Style style) {
+        Paint paint = AndroidGraphicFactory.INSTANCE.createPaint();
+        paint.setColor(color);
+        paint.setStrokeWidth(strokeWidth);
+        paint.setStyle(style);
+        return paint;
+    }
+
+    protected void addTrack(Layers layers, List<LatLong> track) {
+        Polyline polyline = new Polyline(createPaint(
+                AndroidGraphicFactory.INSTANCE.createColor(Color.RED),
+                (int) (4 * mapView.getModel().displayModel.getScaleFactor()),
+                Style.STROKE), AndroidGraphicFactory.INSTANCE);
+        List<LatLong> latLongs = new ArrayList<>();
+        for (LatLong p : track)
+            latLongs.add(p);
+        polyline.setPoints(latLongs);
+        layers.add(polyline);
+    }
+
+    private List<LatLong> decodeGPX(InputStream fileInputStream){
+        List<LatLong> list = new ArrayList<LatLong>();
+
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+        try {
+            DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+            Document document = documentBuilder.parse(fileInputStream);
+            Element elementRoot = document.getDocumentElement();
+
+            NodeList nodelist_trkpt = elementRoot.getElementsByTagName("trkpt");
+
+            for(int i = 0; i < nodelist_trkpt.getLength(); i++){
+                Node node = nodelist_trkpt.item(i);
+                NamedNodeMap attributes = node.getAttributes();
+
+                String newLatitude = attributes.getNamedItem("lat").getTextContent();
+                Double newLatitude_double = Double.parseDouble(newLatitude);
+
+                String newLongitude = attributes.getNamedItem("lon").getTextContent();
+                Double newLongitude_double = Double.parseDouble(newLongitude);
+                list.add(new LatLong(newLatitude_double, newLongitude_double));
+            }
+            fileInputStream.close();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return list;
+    }
+
+    private void createTileCaches() {
+        /*this.tileCaches.add(AndroidUtil.createTileCache(this, getPersistableId(),
                 this.mapView.getModel().displayModel.getTileSize(), this.getScreenRatio(),
-                this.mapView.getModel().frameBufferModel.getOverdrawFactor()));
+                this.mapView.getModel().frameBufferModel.getOverdrawFactor(), true));*/
+        boolean persistent = true;
+
+        Display display = ((WindowManager) getSystemService(WINDOW_SERVICE))
+                .getDefaultDisplay();
+        final int hypot;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR2) {
+            android.graphics.Point point = new android.graphics.Point();
+            display.getSize(point);
+            hypot = (int) Math.hypot(point.x, point.y);
+        } else {
+            hypot = (int) Math.hypot(display.getWidth(), display.getHeight());
+        }
+        this.tileCaches.add(AndroidUtil.createTileCache(this,
+                getPersistableId(),
+                this.mapView.getModel().displayModel.getTileSize(), hypot,
+                hypot,
+                this.mapView.getModel().frameBufferModel.getOverdrawFactor(), false));
+    }
+
+    protected IMapViewPosition initializePosition(IMapViewPosition mvp) {
+        LatLong center = mvp.getCenter();
+        if (center.equals(new LatLong(0, 0))) {
+            mvp.setMapPosition(new MapPosition(new LatLong(61.814784429854, 54.514741140922), (byte) 8));
+        }
+        mvp.setZoomLevelMax((byte) 24);
+        mvp.setZoomLevelMin((byte) 0);
+        return mvp;
     }
 
     @Override
-    protected MapPosition getInitialPosition() {
-        int tileSize = this.mapView.getModel().displayModel.getTileSize();
-        byte zoomLevel = LatLongUtils.zoomForBounds(new Dimension(tileSize * 4, tileSize * 4), getMapFile().boundingBox(), tileSize);
-        return new MapPosition(getMapFile().boundingBox().getCenterPoint(), zoomLevel);
+    protected void onDestroy() {
+        persistenceManager.close();
+        super.onDestroy();
+    }
+
+    private PreferencesFacade preferencesFacade;
+    private XmlRenderThemeStyleMenu renderThemeStyleMenu;
+
+    private MapView getMapView() {
+        setContentView(R.layout.mapviewer);
+        return (MapView) findViewById(R.id.mapView);
+    }
+
+    private void createMapViews() {
+        mapView = getMapView();
+        mapView.getModel().init(this.preferencesFacade);
+        mapView.getMapScaleBar().setVisible(true);
+    }
+
+    private String getPersistableId() {
+        return this.getClass().getSimpleName();
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        AndroidGraphicFactory.createInstance(this);
+        this.preferencesFacade = new AndroidPreferences(this.getSharedPreferences(getPersistableId(), MODE_PRIVATE));
+        createMapViews();
+        createTileCaches();
+        createLayers();
+        createControls();
         setTitle(getClass().getSimpleName());
+        persistenceManager = AndroidPoiPersistenceManagerFactory.getPoiPersistenceManager(new File("/storage/emulated/0/Documents/berlin.poi").getAbsolutePath());
+        try {
+            for (PoiCategory c : persistenceManager.getCategoryManager().getRootCategory().deepChildren())
+                Log.i("mapsforge", "Category: " + c.getTitle() + " <" + c.getParent().getTitle() + ">");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        registerReceiver(downloadReceiver, filter);
     }
-}
+
+    private class PoiSearchTask extends android.os.AsyncTask<BoundingBox, Void, Collection<PointOfInterest>> {
+        private final WeakReference<MainActivity> weakActivity;
+        private final String category;
+        private final boolean address;
+
+        private PoiSearchTask(MainActivity activity, String category, boolean address) {
+            this.weakActivity = new WeakReference<>(activity);
+            this.category = category;
+            this.address = address;
+        }
+
+        @Override
+        protected Collection<PointOfInterest> doInBackground(BoundingBox... params) {
+            if (address)
+                chooseStreet(category);
+            else {
+                // Search POI
+                try {
+                    PoiCategoryFilter categoryFilter = null;
+                    if (!category.equals("All")) {
+                        PoiCategoryManager categoryManager = persistenceManager.getCategoryManager();
+                        categoryFilter = new WhitelistPoiCategoryFilter();
+                        categoryFilter.addCategory(categoryManager.getPoiCategoryByTitle(category));
+                    }
+                    return persistenceManager.findInRect(params[0], categoryFilter, null, Integer.MAX_VALUE);
+                } catch (Throwable t) {
+                    Log.e(TAG, t.getMessage(), t);
+                }
+            }
+            return null;
+        }
+
+        private static final String TAG = "offlinemaps";
+
+        @Override
+        protected void onPostExecute(Collection<PointOfInterest> pointOfInterests) {
+            final MainActivity activity = weakActivity.get();
+            if (activity == null) {
+                return;
+            }
+            Toast.makeText(activity, category + ": " + (pointOfInterests != null ? pointOfInterests.size() : 0), Toast.LENGTH_SHORT).show();
+            if (pointOfInterests == null) {
+                return;
+            }
+
+            // Overlay POI
+            groupLayer = new GroupLayer();
+            Bitmap bitmap = new AndroidBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.marker_green));
+            for (final PointOfInterest pointOfInterest : pointOfInterests) {
+                Marker marker = new MainActivity.MarkerImpl(pointOfInterest.getLatLong(), bitmap, 0, -bitmap.getHeight() / 2, pointOfInterest);
+                groupLayer.layers.add(marker);
+            }
+            mapView.getLayerManager().getLayers().add(groupLayer);
+            mapView.getLayerManager().redrawLayers();
+        }
+    }
+
+    private class MarkerImpl extends Marker {
+        private final PointOfInterest pointOfInterest;
+
+        private MarkerImpl(LatLong latLong, Bitmap bitmap, int horizontalOffset, int verticalOffset, PointOfInterest pointOfInterest) {
+            super(latLong, bitmap, horizontalOffset, verticalOffset);
+            this.pointOfInterest = pointOfInterest;
+        }
+
+        @Override
+        public boolean onTap(LatLong tapLatLong, Point layerXY, Point tapXY) {
+            // GroupLayer does not have a position, layerXY is null
+            layerXY = mapView.getMapViewProjection().toPixels(getPosition());
+            if (contains(layerXY, tapXY)) {
+                Toast.makeText(MainActivity.this, pointOfInterest.getName(), Toast.LENGTH_SHORT).show();
+                Log.i("mapsforge", pointOfInterest.toString());
+                return true;
+            }
+            return false;
+        }
+    }}
