@@ -689,13 +689,13 @@ public class MainActivity extends Activity implements LocationListener {
                 getPersistableId(),
                 this.mapView.getModel().displayModel.getTileSize(), hypot,
                 hypot,
-                this.mapView.getModel().frameBufferModel.getOverdrawFactor(), false));
+                this.mapView.getModel().frameBufferModel.getOverdrawFactor(), true));
     }
 
     protected IMapViewPosition initializePosition(IMapViewPosition mvp) {
         LatLong center = mvp.getCenter();
         if (center.equals(new LatLong(0, 0))) {
-            mvp.setMapPosition(new MapPosition(new LatLong(61.814784429854, 54.514741140922), (byte) 8));
+            mvp.setMapPosition(new MapPosition(new LatLong(61.814784429854, 54.514741140922), (byte) 17));
         }
         mvp.setZoomLevelMax((byte) 24);
         mvp.setZoomLevelMin((byte) 0);
@@ -703,7 +703,16 @@ public class MainActivity extends Activity implements LocationListener {
     }
 
     @Override
+    protected void onPause() {
+        mapView.getModel().save(this.preferencesFacade);
+        this.preferencesFacade.save();
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
+        mapView.destroyAll();
+        AndroidGraphicFactory.clearResourceMemoryCache();
         for (PoiPersistenceManager elem : persistenceManager)
             elem.close();
         super.onDestroy();
