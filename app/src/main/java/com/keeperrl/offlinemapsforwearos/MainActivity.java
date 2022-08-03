@@ -2,128 +2,116 @@
 package com.keeperrl.offlinemapsforwearos;
 
 import android.app.Activity;
-        import android.app.AlertDialog;
-        import android.app.DownloadManager;
-        import android.content.BroadcastReceiver;
-        import android.content.Context;
-        import android.content.DialogInterface;
-        import android.content.Intent;
-        import android.content.IntentFilter;
-        import android.database.Cursor;
-        import android.graphics.BitmapFactory;
-        import android.location.Location;
-        import android.location.LocationListener;
-        import android.location.LocationManager;
-        import android.net.Uri;
-        import android.os.Build;
-        import android.os.Bundle;
-        import android.os.Environment;
-        import android.text.InputType;
-        import android.util.Log;
-        import android.view.Display;
-        import android.view.LayoutInflater;
-        import android.view.MotionEvent;
-        import android.view.View;
-        import android.view.WindowManager;
-        import android.widget.AdapterView;
-        import android.widget.ArrayAdapter;
-        import android.widget.EditText;
-        import android.widget.ImageButton;
-        import android.widget.ListView;
-        import android.widget.PopupWindow;
-        import android.widget.Toast;
+import android.app.AlertDialog;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.database.Cursor;
+import android.graphics.BitmapFactory;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Environment;
+import android.text.InputType;
+import android.util.Log;
+import android.view.Display;
+import android.view.LayoutInflater;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ListView;
+import android.widget.PopupWindow;
+import android.widget.Toast;
 
-        import androidx.core.view.InputDeviceCompat;
-        import androidx.core.view.MotionEventCompat;
+import androidx.core.view.InputDeviceCompat;
+import androidx.core.view.MotionEventCompat;
 
-        import org.mapsforge.core.graphics.Bitmap;
-        import org.mapsforge.core.graphics.Color;
-        import org.mapsforge.core.graphics.Paint;
-        import org.mapsforge.core.graphics.Style;
-        import org.mapsforge.core.model.BoundingBox;
-import org.mapsforge.core.model.Dimension;
+import org.mapsforge.core.graphics.Bitmap;
+import org.mapsforge.core.graphics.Color;
+import org.mapsforge.core.graphics.Paint;
+import org.mapsforge.core.graphics.Style;
+import org.mapsforge.core.model.BoundingBox;
 import org.mapsforge.core.model.LatLong;
-        import org.mapsforge.core.model.MapPosition;
-        import org.mapsforge.core.model.Point;
-        import org.mapsforge.core.model.Tag;
-import org.mapsforge.core.util.LatLongUtils;
+import org.mapsforge.core.model.MapPosition;
+import org.mapsforge.core.model.Point;
 import org.mapsforge.map.android.graphics.AndroidBitmap;
-        import org.mapsforge.map.android.graphics.AndroidGraphicFactory;
-        import org.mapsforge.map.android.layers.MyLocationOverlay;
-        import org.mapsforge.map.android.util.AndroidPreferences;
-        import org.mapsforge.map.android.util.AndroidUtil;
-import org.mapsforge.map.android.util.MapViewerTemplate;
+import org.mapsforge.map.android.graphics.AndroidGraphicFactory;
+import org.mapsforge.map.android.layers.MyLocationOverlay;
+import org.mapsforge.map.android.util.AndroidPreferences;
+import org.mapsforge.map.android.util.AndroidUtil;
 import org.mapsforge.map.android.view.MapView;
-        import org.mapsforge.map.datastore.MapDataStore;
-        import org.mapsforge.map.datastore.MultiMapDataStore;
-        import org.mapsforge.map.layer.GroupLayer;
-        import org.mapsforge.map.layer.Layers;
-        import org.mapsforge.map.layer.cache.TileCache;
-        import org.mapsforge.map.layer.debug.TileCoordinatesLayer;
-        import org.mapsforge.map.layer.debug.TileGridLayer;
-        import org.mapsforge.map.layer.download.TileDownloadLayer;
-        import org.mapsforge.map.layer.download.tilesource.OpenStreetMapMapnik;
-        import org.mapsforge.map.layer.labels.LabelLayer;
-        import org.mapsforge.map.layer.labels.MapDataStoreLabelStore;
-        import org.mapsforge.map.layer.labels.ThreadedLabelLayer;
-        import org.mapsforge.map.layer.overlay.Circle;
-        import org.mapsforge.map.layer.overlay.Marker;
-        import org.mapsforge.map.layer.overlay.Polyline;
-        import org.mapsforge.map.layer.renderer.TileRendererLayer;
-        import org.mapsforge.map.model.IMapViewPosition;
-        import org.mapsforge.map.model.common.PreferencesFacade;
-        import org.mapsforge.map.reader.MapFile;
-        import org.mapsforge.map.rendertheme.InternalRenderTheme;
-import org.mapsforge.map.rendertheme.XmlRenderTheme;
+import org.mapsforge.map.datastore.MapDataStore;
+import org.mapsforge.map.datastore.MultiMapDataStore;
+import org.mapsforge.map.layer.GroupLayer;
+import org.mapsforge.map.layer.Layers;
+import org.mapsforge.map.layer.cache.TileCache;
+import org.mapsforge.map.layer.labels.LabelLayer;
+import org.mapsforge.map.layer.labels.MapDataStoreLabelStore;
+import org.mapsforge.map.layer.labels.ThreadedLabelLayer;
+import org.mapsforge.map.layer.overlay.Circle;
+import org.mapsforge.map.layer.overlay.Marker;
+import org.mapsforge.map.layer.overlay.Polyline;
+import org.mapsforge.map.layer.renderer.TileRendererLayer;
+import org.mapsforge.map.model.IMapViewPosition;
+import org.mapsforge.map.model.common.PreferencesFacade;
+import org.mapsforge.map.reader.MapFile;
+import org.mapsforge.map.rendertheme.InternalRenderTheme;
 import org.mapsforge.map.rendertheme.XmlRenderThemeStyleMenu;
-        import org.mapsforge.map.scalebar.DefaultMapScaleBar;
-        import org.mapsforge.map.scalebar.MapScaleBar;
-        import org.mapsforge.map.scalebar.MetricUnitAdapter;
-        import org.mapsforge.map.view.InputListener;
-        import org.mapsforge.poi.android.storage.AndroidPoiPersistenceManagerFactory;
-        import org.mapsforge.poi.storage.PoiCategory;
-        import org.mapsforge.poi.storage.PoiCategoryFilter;
-        import org.mapsforge.poi.storage.PoiCategoryManager;
-        import org.mapsforge.poi.storage.PoiPersistenceManager;
-        import org.mapsforge.poi.storage.PointOfInterest;
-        import org.mapsforge.poi.storage.WhitelistPoiCategoryFilter;
-        import org.w3c.dom.Document;
-        import org.w3c.dom.Element;
-        import org.w3c.dom.NamedNodeMap;
-        import org.w3c.dom.Node;
-        import org.w3c.dom.NodeList;
+import org.mapsforge.map.scalebar.DefaultMapScaleBar;
+import org.mapsforge.map.scalebar.MapScaleBar;
+import org.mapsforge.map.scalebar.MetricUnitAdapter;
+import org.mapsforge.map.view.InputListener;
+import org.mapsforge.poi.android.storage.AndroidPoiPersistenceManagerFactory;
+import org.mapsforge.poi.storage.PoiCategoryFilter;
+import org.mapsforge.poi.storage.PoiCategoryManager;
+import org.mapsforge.poi.storage.PoiPersistenceManager;
+import org.mapsforge.poi.storage.PointOfInterest;
+import org.mapsforge.poi.storage.WhitelistPoiCategoryFilter;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
-        import java.io.File;
-        import java.io.FileOutputStream;
-        import java.io.InputStream;
-        import java.io.OutputStream;
-        import java.lang.ref.WeakReference;
-        import java.util.ArrayList;
-        import java.util.Collection;
-        import java.util.HashMap;
-        import java.util.HashSet;
-        import java.util.List;
-        import java.util.Set;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-        import javax.xml.parsers.DocumentBuilder;
-        import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 
-/**
- * The simplest form of creating a map viewer based on the MapViewerTemplate.
- * It also demonstrates the use simplified cleanup operation at activity exit.
- */
 public class MainActivity extends Activity implements LocationListener {
 
     protected MapView mapView;
     protected List<TileCache> tileCaches = new ArrayList<TileCache>();
 
+    static private final String TAG = "OfflineMaps";
+
     @Override
     public boolean onGenericMotionEvent(MotionEvent ev) {
-        Log.i("mapsforge", "Generic motion " + ev.toString());
+        Log.i(TAG, "Generic motion " + ev.toString());
         if (ev.getAction() == MotionEvent.ACTION_SCROLL &&
                 ev.isFromSource(InputDeviceCompat.SOURCE_ROTARY_ENCODER)
         ) {
-            Log.i("mapsforge", "Rotary motion " + ev.toString());
+            Log.i(TAG, "Rotary motion " + ev.toString());
             // Don't forget the negation here
             if (ev.getAxisValue(MotionEventCompat.AXIS_SCROLL) < 0)
                 mapView.getModel().mapViewPosition.zoomIn(false);
@@ -242,15 +230,59 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.showAsDropDown(mapView, 50, -30);
     }
 
-    File getMapPath(String name) {
-        return new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), name + ".map");
+    private class DownloadInfo {
+        public DownloadInfo(String name, String extension, String url, int size) {
+            this.name = name;
+            this.url = url;
+            this.size = size;
+            this.extension = extension;
+        }
+
+        public String getFileName() {
+            return name + extension;
+        }
+
+        public File getDownloadedPath() {
+            return new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), getFileName());
+        }
+
+        public String getTmpName() {
+            return getFileName() + ".tmp";
+        }
+
+        public File getTmpPath() {
+            return new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), getTmpName());
+        }
+
+        String name;
+        String extension;
+        String url;
+        int size;
     }
 
-    final String[] allMaps = new String[]{"sweden", "poland", "kosovo", "andorra"};
+    final DownloadInfo[] allMaps = new DownloadInfo[]{
+            new DownloadInfo("Sweden", ".map",
+                    "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/sweden.map", 100),
+            new DownloadInfo("Sweden POI", ".poi",
+                    "http://keeperrl.com/~michal/sweden.poi", 100),
+            new DownloadInfo("Poland", ".map",
+                    "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/poland.map", 100),
+            new DownloadInfo("Andorra", ".map",
+                    "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/andorra.map", 100)
+    };
+
+
+    private int getMapIndex(String name) {
+        for (int i = 0; i < allMaps.length; ++i)
+            if (allMaps[i].getTmpName().equals(name))
+                return i;
+        throw new RuntimeException("Bad map name: " + name);
+    }
+
     StringBuffer[] labels = null;
     ArrayAdapter mapDownloadsAdapter;
-    HashMap<String, Long> fetching;
-    Set<String> ready;
+    HashMap<Integer, Long> fetching;
+    Set<Integer> ready;
 
     void downloadMapsAction() {
         LayoutInflater layoutInflater =
@@ -267,17 +299,14 @@ public class MainActivity extends Activity implements LocationListener {
         q.setFilterByStatus(DownloadManager.STATUS_RUNNING);
         labels = new StringBuffer[allMaps.length];
         for (int i = 0; i < allMaps.length; ++i)
-            labels[i] = new StringBuffer(allMaps[i]);
-        List<String> uris = new ArrayList<String>();
-        ready = new HashSet<String>();
-        fetching = new HashMap<String, Long>();
+            labels[i] = new StringBuffer(allMaps[i].name);
+        ready = new HashSet<Integer>();
+        fetching = new HashMap<Integer, Long>();
         for (int i = 0; i < allMaps.length; ++i) {
-            Log.i("mapsforge", "Checking " + getMapPath(allMaps[i]).getAbsolutePath());
-            if (getMapPath(allMaps[i]).exists()) {
-                ready.add(allMaps[i]);
+            if (allMaps[i].getDownloadedPath().exists()) {
+                ready.add(i);
                 labels[i].append("[Ready]");
             }
-            uris.add("http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/" + allMaps[i] + ".map");
         }
         DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
         Cursor cursor = downloadManager.query(q);
@@ -286,11 +315,11 @@ public class MainActivity extends Activity implements LocationListener {
                 String uri = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_URI));
                 String path = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
                 long id = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_ID));
-                for (int i = 0; i < uris.size(); ++i)
-                    if (uris.get(i).equals(uri)) {
-                        Log.i("mapsforge", "Fetching " + allMaps[i] + " to " + path);
-                        labels[i].replace(0, 100000, allMaps[i] + " [Fetching]");
-                        fetching.put(allMaps[i], id);
+                for (int i = 0; i < allMaps.length; ++i)
+                    if (allMaps[i].url.equals(uri)) {
+                        Log.i(TAG, "Fetching " + allMaps[i].name + " to " + path);
+                        labels[i].replace(0, 100000, allMaps[i].name + " [Fetching]");
+                        fetching.put(i, id);
                     }
             } while (cursor.moveToNext());
         }
@@ -300,18 +329,16 @@ public class MainActivity extends Activity implements LocationListener {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                if (fetching.containsKey(allMaps[i])) {
+                if (fetching.containsKey(i)) {
                     Intent intent = new Intent();
                     intent.setAction(DownloadManager.ACTION_VIEW_DOWNLOADS);
                     startActivity(intent);
                 } else
-                if (ready.contains(allMaps[i])) {
+                if (ready.contains(i)) {
                     downloadedMapMenu(i);
                 } else {
-                    downloadMap(allMaps[i], uris.get(i));
-                    if (labels == null)
-                        Log.i("mapsforge", "NULL");
-                    labels[i].replace(0, 100000, allMaps[i] + " [Fetching]");
+                    downloadMap(i, allMaps[i].url);
+                    labels[i].replace(0, 100000, allMaps[i].name + " [Fetching]");
                     mapDownloadsAdapter.notifyDataSetChanged();
                 }
             }
@@ -320,7 +347,7 @@ public class MainActivity extends Activity implements LocationListener {
     }
 
     void downloadedMapMenu(int mapIndex) {
-        String name = allMaps[mapIndex];
+        DownloadInfo map = allMaps[mapIndex];
         View popupView = ((LayoutInflater)getBaseContext()
                 .getSystemService(LAYOUT_INFLATER_SERVICE)).inflate(R.layout.categorypopup, null);
         final PopupWindow popupWindow = new PopupWindow(
@@ -336,9 +363,9 @@ public class MainActivity extends Activity implements LocationListener {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int button, long l) {
-                getMapPath(name).delete();
-                ready.remove(name);
-                labels[mapIndex].replace(0, 100000, allMaps[mapIndex]);
+                map.getDownloadedPath().delete();
+                ready.remove(mapIndex);
+                labels[mapIndex].replace(0, 100000, allMaps[mapIndex].name);
                 mapDownloadsAdapter.notifyDataSetChanged();
                 popupWindow.dismiss();
                 reloadLayers();
@@ -347,20 +374,20 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.showAsDropDown(mapView, 50, -30);
     }
 
-    void downloadMap(String name, String url) {
+    void downloadMap(int index, String url) {
         DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
         //Set whether this download may proceed over a roaming connection.
         request.setAllowedOverRoaming(false);
         //Set the title of this download, to be displayed in notifications (if enabled).
-        request.setTitle("Cheesecake map download: " + name);
+        request.setTitle("Offline map download (" + allMaps[index].name + ")");
         //Set a description of this download, to be displayed in notifications (if enabled)
         request.setDescription("");
         //Set the local destination for the downloaded file to a path within the application's external files directory
-        File target = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), name + ".map.tmp");
+        File target = allMaps[index].getTmpPath();
         if (target.exists())
             target.delete();
-        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS,name + ".map.tmp");
+        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, allMaps[index].getTmpName());
         downloadManager.enqueue(request);
         //Enqueue a new download and same the referenceId
         //downloadReference = downloadManager.enqueue(request);
@@ -370,44 +397,29 @@ public class MainActivity extends Activity implements LocationListener {
         @Override
         public void onReceive(Context context, Intent intent) {
             Long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, 0);
-            Log.i("mapsforge","Checking download status for id: " + downloadId);
+            Log.i(TAG,"Checking download status for id: " + downloadId);
             DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
             Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(downloadId));
 
             if (cursor.moveToFirst()) {
                 String path = Uri.parse(cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI))).getPath();
                 File file = new File(path);
-                String mapName = file.getName().substring(0, file.getName().length() - 8);
+                int mapIndex = getMapIndex(file.getName());
                 int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
                 if (status == DownloadManager.STATUS_FAILED) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            for (int i = 0; i < allMaps.length; ++i)
-                                if (allMaps[i].equals(mapName)) {
-                                    labels[i].replace(0, 100000, allMaps[i]);
-                                    fetching.remove(allMaps[i]);
-                                    mapDownloadsAdapter.notifyDataSetChanged();
-                                }
-                        }
-                    });
+                    labels[mapIndex].replace(0, 100000, allMaps[mapIndex].name);
+                    fetching.remove(mapIndex);
+                    mapDownloadsAdapter.notifyDataSetChanged();
                 }
                 if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                    file.renameTo(new File(path.substring(0, path.length() - 4)));
-                    Log.i("mapsforge", "Downloaded map:" + mapName);
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            for (int i = 0; i < allMaps.length; ++i)
-                                if (allMaps[i].equals(mapName)) {
-                                    labels[i].replace(0, 100000, allMaps[i] + " [Ready]");
-                                    fetching.remove(allMaps[i]);
-                                    ready.add(allMaps[i]);
-                                    mapDownloadsAdapter.notifyDataSetChanged();
-                                    reloadLayers();
-                                }
-                        }
-                    });
+                    file.renameTo(allMaps[mapIndex].getDownloadedPath());
+                    Log.i(TAG, "Downloaded map:" + allMaps[mapIndex].name);
+                    Toast.makeText(MainActivity.this, "Download is ready: " + allMaps[mapIndex].name, Toast.LENGTH_SHORT).show();
+                    labels[mapIndex].replace(0, 100000, allMaps[mapIndex].name + " [Ready]");
+                    fetching.remove(mapIndex);
+                    ready.add(mapIndex);
+                    mapDownloadsAdapter.notifyDataSetChanged();
+                    reloadLayers();
                 }
             }
         }
@@ -427,7 +439,7 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.setOutsideTouchable(true);
         popupWindow.setFocusable(true);
         ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        String[] elems = new String[]{"Food", "Shop", "Health care", "Public Transport", "Sport", "Tourism", "Natural", "Leisure", "Historic", "Emergency", "Playgrounds", "All"};
+        String[] elems = new String[]{"Food", "Shop", "Health care", "Public Transport", "Sport", "Tourism", "Natural", "Historic", "Emergency", "Playgrounds", "All"};
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<String>(MainActivity.this,
                         R.layout.categoryelem, elems);
@@ -438,7 +450,7 @@ public class MainActivity extends Activity implements LocationListener {
                 mapView.getLayerManager().redrawLayers();
                 // POI search
                 new MainActivity.PoiSearchTask(MainActivity.this, elems[i], false).execute(mapView.getBoundingBox());
-                Log.i("mapsforge", "Selected " + elems[i] + " " + Integer.toString(i) + " " + Long.toString(l));
+                Log.i(TAG, "Selected " + elems[i] + " " + Integer.toString(i) + " " + Long.toString(l));
                 popupWindow.dismiss();
             }
         });
@@ -446,7 +458,7 @@ public class MainActivity extends Activity implements LocationListener {
     }
 
     void chooseStreet(String street) {
-        WhitelistPoiCategoryFilter filter = new WhitelistPoiCategoryFilter();
+        /*WhitelistPoiCategoryFilter filter = new WhitelistPoiCategoryFilter();
         try {
             filter.addCategory(persistenceManager.getCategoryManager().getPoiCategoryByTitle("Address"));
         } catch (Exception e) {
@@ -459,7 +471,7 @@ public class MainActivity extends Activity implements LocationListener {
                 if (t.key.equals("addr:street"))
                     streets.add(t.value);
         }
-        Log.i("mapsforge", Integer.toString(streets.size()) + " results");
+        Log.i(TAG, Integer.toString(streets.size()) + " results");*/
     }
 
     void streetAction() {
@@ -489,7 +501,7 @@ public class MainActivity extends Activity implements LocationListener {
     }
 
     private GroupLayer groupLayer;
-    private PoiPersistenceManager persistenceManager;
+    private List<PoiPersistenceManager> persistenceManager = new ArrayList<>();
 
     File getAssetFile(String path) {
         try {
@@ -507,19 +519,31 @@ public class MainActivity extends Activity implements LocationListener {
         }
     }
 
+    void reloadPois() {
+        File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        for (File f : dir.listFiles()) {
+            if (f.getName().endsWith(".poi")) {
+                Log.i(TAG, "Found POI file: " + f.getAbsolutePath());
+                persistenceManager.add(AndroidPoiPersistenceManagerFactory.getPoiPersistenceManager(f.getAbsolutePath()));
+            }
+        }
+    }
+
     MapDataStore getDownloadedMaps() {
         MultiMapDataStore dataStore = new MultiMapDataStore(MultiMapDataStore.DataPolicy.RETURN_FIRST);
         File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
         for (File f : dir.listFiles()) {
-            Log.i("mapsforge", "Found file: " + f.getAbsolutePath());
             if (f.getName().endsWith(".map")) {
+                Log.i(TAG, "Found map file: " + f.getAbsolutePath());
                 MapFile file = new MapFile(f);
                 file.restrictToZoomRange((byte) 6, Byte.MAX_VALUE);
                 dataStore.addMapDataStore(file, false, false);
                 if (Character.isDigit(f.getName().charAt(f.getName().length() - 5)))
                     f.delete();
-            } else
+            } else if (!f.getName().endsWith(".poi")) {
+                Log.i(TAG, "Removing unknown file: " + f.getAbsolutePath());
                 f.delete();
+            }
         }
         dataStore.addMapDataStore(new MapFile(getAssetFile("mapsforge/world.map")), false, false);
         return dataStore;
@@ -544,6 +568,7 @@ public class MainActivity extends Activity implements LocationListener {
         LabelLayer labelLayer = new ThreadedLabelLayer(AndroidGraphicFactory.INSTANCE, labelStore);
         mapView.getLayerManager().getLayers().add(labelLayer);
         this.mapView.getLayerManager().getLayers().add(this.myLocationOverlay);
+        reloadPois();
     }
 
     private void createLayers() {
@@ -679,7 +704,8 @@ public class MainActivity extends Activity implements LocationListener {
 
     @Override
     protected void onDestroy() {
-        persistenceManager.close();
+        for (PoiPersistenceManager elem : persistenceManager)
+            elem.close();
         super.onDestroy();
     }
 
@@ -711,13 +737,6 @@ public class MainActivity extends Activity implements LocationListener {
         createLayers();
         createControls();
         setTitle(getClass().getSimpleName());
-        persistenceManager = AndroidPoiPersistenceManagerFactory.getPoiPersistenceManager(new File("/storage/emulated/0/Documents/berlin.poi").getAbsolutePath());
-        try {
-            for (PoiCategory c : persistenceManager.getCategoryManager().getRootCategory().deepChildren())
-                Log.i("mapsforge", "Category: " + c.getTitle() + " <" + c.getParent().getTitle() + ">");
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         registerReceiver(downloadReceiver, filter);
     }
@@ -739,22 +758,24 @@ public class MainActivity extends Activity implements LocationListener {
                 chooseStreet(category);
             else {
                 // Search POI
-                try {
-                    PoiCategoryFilter categoryFilter = null;
-                    if (!category.equals("All")) {
-                        PoiCategoryManager categoryManager = persistenceManager.getCategoryManager();
-                        categoryFilter = new WhitelistPoiCategoryFilter();
-                        categoryFilter.addCategory(categoryManager.getPoiCategoryByTitle(category));
+                List<PointOfInterest> ret = new ArrayList<>();
+                for (PoiPersistenceManager elem : persistenceManager)
+                    try {
+                        PoiCategoryFilter categoryFilter = null;
+                        if (!category.equals("All")) {
+                            PoiCategoryManager categoryManager = elem.getCategoryManager();
+                            categoryFilter = new WhitelistPoiCategoryFilter();
+                            categoryFilter.addCategory(categoryManager.getPoiCategoryByTitle(category));
+                        }
+                        for (PointOfInterest poi : elem.findInRect(params[0], categoryFilter, null, Integer.MAX_VALUE))
+                            ret.add(poi);
+                    } catch (Throwable t) {
+                        Log.e(TAG, t.getMessage(), t);
                     }
-                    return persistenceManager.findInRect(params[0], categoryFilter, null, Integer.MAX_VALUE);
-                } catch (Throwable t) {
-                    Log.e(TAG, t.getMessage(), t);
-                }
+                return ret;
             }
             return null;
         }
-
-        private static final String TAG = "offlinemaps";
 
         @Override
         protected void onPostExecute(Collection<PointOfInterest> pointOfInterests) {
@@ -793,7 +814,7 @@ public class MainActivity extends Activity implements LocationListener {
             layerXY = mapView.getMapViewProjection().toPixels(getPosition());
             if (contains(layerXY, tapXY)) {
                 Toast.makeText(MainActivity.this, pointOfInterest.getName(), Toast.LENGTH_SHORT).show();
-                Log.i("mapsforge", pointOfInterest.toString());
+                Log.i(TAG, pointOfInterest.toString());
                 return true;
             }
             return false;
