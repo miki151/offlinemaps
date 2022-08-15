@@ -5,11 +5,13 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.BitmapFactory;
 import android.location.Location;
 import android.location.LocationListener;
@@ -18,8 +20,10 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.OpenableColumns;
 import android.text.InputType;
 import android.util.Log;
+import android.util.Pair;
 import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -83,13 +87,24 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.lang.ref.WeakReference;
+import java.sql.Array;
+import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -98,12 +113,16 @@ import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import info.debatty.java.stringsimilarity.Levenshtein;
+import info.debatty.java.stringsimilarity.NGram;
+import info.debatty.java.stringsimilarity.QGram;
+
 public class MainActivity extends Activity implements LocationListener {
 
     protected MapView mapView;
     protected List<TileCache> tileCaches = new ArrayList<TileCache>();
 
-    static private final String TAG = "OfflineMaps";
+    static final String TAG = "OfflineMaps";
 
     @Override
     public boolean onGenericMotionEvent(MotionEvent ev) {
@@ -190,6 +209,58 @@ public class MainActivity extends Activity implements LocationListener {
         });
     }
 
+    void tracksMenu() {
+        if (tracks.isEmpty()) {
+            confirmationDialog("To import a track, click on a GPX file and open it with this app.", null);
+            return;
+        }
+        View popupView = ((LayoutInflater)getBaseContext()
+                .getSystemService(LAYOUT_INFLATER_SERVICE)).inflate(R.layout.categorypopup, null);
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        List<String> elems = new ArrayList<>();
+        for (Track t : tracks)
+            elems.add(t.name);
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(MainActivity.this,
+                        R.layout.categoryelem, elems);
+        listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int button, long l) {
+                multiMenu(Arrays.asList("Activate", "Erase"), Arrays.asList(new Runnable() {
+                    @Override
+                    public void run() {
+                        currentTrack = tracks.get(button);
+                        popupWindow.dismiss();
+                        reloadLayers();
+                    }
+                }, new Runnable() {
+                    @Override
+                    public void run() {
+                        confirmationDialog("Erase this track?", new Runnable() {
+                            @Override
+                            public void run() {
+                                Track toRemove = tracks.get(button);
+                                if (currentTrack == toRemove) {
+                                    currentTrack = null;
+                                    reloadLayers();
+                                }
+                                toRemove.file.delete();
+                                tracks.remove(button);
+                                popupWindow.dismiss();
+                            }
+                        });
+                    }
+                }));
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+    }
+
     void popupMenu() {
         LayoutInflater layoutInflater =
                 (LayoutInflater)getBaseContext()
@@ -201,7 +272,7 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.setOutsideTouchable(true);
         popupWindow.setFocusable(true);
         ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        String[] elems = new String[]{"Find address", "Show POIs", "Download maps", "Settings"};
+        String[] elems = new String[]{"Find address", "Show POIs", "Tracks", "Download maps", "Settings"};
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<String>(MainActivity.this,
                         R.layout.categoryelem, elems);
@@ -212,14 +283,20 @@ public class MainActivity extends Activity implements LocationListener {
                 switch (i) {
                     case 0:
                         streetAction();
+                        popupWindow.dismiss();
                         break;
                     case 1:
                         searchAction();
+                        popupWindow.dismiss();
                         break;
                     case 2:
-                        downloadMapsAction();
+                        tracksMenu();
+                        popupWindow.dismiss();
                         break;
                     case 3:
+                        downloadMapsAction();
+                        break;
+                    case 4:
                         break;
                     default:
                         throw new RuntimeException("Unknown menu item: " + Integer.toString(i));
@@ -264,7 +341,7 @@ public class MainActivity extends Activity implements LocationListener {
             new DownloadInfo("Sweden", ".map",
                     "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/sweden.map", 100),
             new DownloadInfo("Sweden POI", ".poi",
-                    "http://keeperrl.com/~michal/sweden.poi", 100),
+                    "http://192.168.0.5/~michal/sweden.poi", 100),
             new DownloadInfo("Poland", ".map",
                     "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/poland.map", 100),
             new DownloadInfo("Andorra", ".map",
@@ -335,7 +412,22 @@ public class MainActivity extends Activity implements LocationListener {
                     startActivity(intent);
                 } else
                 if (ready.contains(i)) {
-                    downloadedMapMenu(i);
+                    multiMenu(Arrays.asList("Erase file"), Arrays.asList(new Runnable() {
+                        @Override
+                        public void run() {
+                            confirmationDialog("Erase " + allMaps[i].name + "?", new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            allMaps[i].getDownloadedPath().delete();
+                                            ready.remove(i);
+                                            labels[i].replace(0, 100000, allMaps[i].name);
+                                            mapDownloadsAdapter.notifyDataSetChanged();
+                                            popupWindow.dismiss();
+                                            reloadLayers();
+                                        }
+                                    });
+                        }
+                    }));
                 } else {
                     downloadMap(i, allMaps[i].url);
                     labels[i].replace(0, 100000, allMaps[i].name + " [Fetching]");
@@ -346,8 +438,24 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.showAsDropDown(mapView, 50, -30);
     }
 
-    void downloadedMapMenu(int mapIndex) {
-        DownloadInfo map = allMaps[mapIndex];
+    void confirmationDialog(String message, Runnable action) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setMessage(message)
+                .setIcon(android.R.drawable.ic_dialog_alert);
+        if (action == null)
+                builder.setPositiveButton(android.R.string.yes, null);
+        else
+                builder.setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        action.run();
+                    }
+                })
+                .setNegativeButton(android.R.string.no, null);
+        builder.show();
+    }
+
+    void multiMenu(List<String> choices, List<Runnable> actions) {
         View popupView = ((LayoutInflater)getBaseContext()
                 .getSystemService(LAYOUT_INFLATER_SERVICE)).inflate(R.layout.categorypopup, null);
         final PopupWindow popupWindow = new PopupWindow(
@@ -355,20 +463,15 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.setOutsideTouchable(true);
         popupWindow.setFocusable(true);
         ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        String[] elems = new String[]{"Erase map file"};
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<String>(MainActivity.this,
-                        R.layout.categoryelem, elems);
+                        R.layout.categoryelem, choices);
         listView.setAdapter(adapter);
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int button, long l) {
-                map.getDownloadedPath().delete();
-                ready.remove(mapIndex);
-                labels[mapIndex].replace(0, 100000, allMaps[mapIndex].name);
-                mapDownloadsAdapter.notifyDataSetChanged();
+                actions.get(button).run();
                 popupWindow.dismiss();
-                reloadLayers();
             }
         });
         popupWindow.showAsDropDown(mapView, 50, -30);
@@ -425,31 +528,33 @@ public class MainActivity extends Activity implements LocationListener {
         }
     };
 
+    View getPopupView() {
+        LayoutInflater layoutInflater =
+                (LayoutInflater)getBaseContext()
+                        .getSystemService(LAYOUT_INFLATER_SERVICE);
+        return layoutInflater.inflate(R.layout.categorypopup, null);
+    }
+
     void searchAction() {
         if (groupLayer != null) {
             mapView.getLayerManager().getLayers().remove(groupLayer);
         }
-        LayoutInflater layoutInflater =
-                (LayoutInflater)getBaseContext()
-                        .getSystemService(LAYOUT_INFLATER_SERVICE);
-        View popupView = layoutInflater.inflate(R.layout.categorypopup, null);
+        View popupView = getPopupView();
         final PopupWindow popupWindow = new PopupWindow(
                 popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
-
         popupWindow.setOutsideTouchable(true);
         popupWindow.setFocusable(true);
         ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        String[] elems = new String[]{"Food", "Shop", "Health care", "Public Transport", "Sport", "Tourism", "Natural", "Historic", "Emergency", "Playgrounds", "All"};
+        String[] elems = new String[]{"Food", "Shop", "Health care", "Public Transport", "Sport", "Tourism", "Natural", "Historic", "Emergency", "Playgrounds", "Bad weather shelters", "All"};
         ArrayAdapter<String> adapter =
-                new ArrayAdapter<String>(MainActivity.this,
-                        R.layout.categoryelem, elems);
+                new ArrayAdapter<String>(MainActivity.this, R.layout.categoryelem, elems);
         listView.setAdapter(adapter);
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 mapView.getLayerManager().redrawLayers();
                 // POI search
-                new MainActivity.PoiSearchTask(MainActivity.this, elems[i], false).execute(mapView.getBoundingBox());
+                new MainActivity.PoiSearchTask(MainActivity.this, elems[i]).execute(mapView.getBoundingBox());
                 Log.i(TAG, "Selected " + elems[i] + " " + Integer.toString(i) + " " + Long.toString(l));
                 popupWindow.dismiss();
             }
@@ -457,21 +562,171 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.showAsDropDown(mapView, 50, -30);
     }
 
-    void chooseStreet(String street) {
-        /*WhitelistPoiCategoryFilter filter = new WhitelistPoiCategoryFilter();
-        try {
-            filter.addCategory(persistenceManager.getCategoryManager().getPoiCategoryByTitle("Address"));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    class HouseNumberInfo {
+        HouseNumberInfo(String number, LatLong location) {
+            this.number = number;
+            this.location = location;
         }
-        Collection<PointOfInterest> results = persistenceManager.findInRect(mapView.getBoundingBox(), filter, null, Integer.MAX_VALUE);
-        Set<String> streets = new HashSet<String>();
-        for (PointOfInterest poi : results) {
-            for (Tag t : poi.getTags())
-                if (t.key.equals("addr:street"))
-                    streets.add(t.value);
+        String number;
+        LatLong location;
+    }
+
+    int getHouseNumberInt(String number) {
+        int ret = 0;
+        String s = number.trim();
+        while (!s.isEmpty() && Character.isDigit(s.charAt(0))) {
+            ret = ret * 10 + Character.digit(s.charAt(0), 10);
+            s = s.substring(1);
         }
-        Log.i(TAG, Integer.toString(streets.size()) + " results");*/
+        return ret;
+    }
+
+    List<HouseNumberInfo> getHouseNumbers(StreetInfo street, LatLong curLocation) {
+        List<HouseNumberInfo> results = new ArrayList<>();
+        for (SQLiteDatabase db : poiDatabases) {
+            Cursor c = db.rawQuery("SELECT lat, lon, number from house_numbers where street_id=" + street.id + ";", null);
+            int latIndex = c.getColumnIndex("lat");
+            int lonIndex = c.getColumnIndex("lon");
+            int numberIndex = c.getColumnIndex("number");
+            if (!c.moveToFirst())
+                continue;
+            do {
+                results.add(new HouseNumberInfo(c.getString(numberIndex), new LatLong(
+                        c.getDouble(latIndex), c.getDouble(lonIndex))));
+            } while (c.moveToNext());
+        }
+        results.sort(new Comparator<HouseNumberInfo>() {
+            @Override
+            public int compare(HouseNumberInfo t1, HouseNumberInfo t2) {
+                double d1 = curLocation.sphericalDistance(t1.location);
+                double d2 = curLocation.sphericalDistance(t2.location);
+                return Double.compare(d1, d2);
+            }
+        });
+        int lastSorted = 0;
+        for (int i = 1; i <= results.size(); ++i)
+            if (i == results.size() || (i - lastSorted > 1 && results.get(i - 1).location.sphericalDistance(results.get(i).location) > 5000)) {
+                results.subList(lastSorted, i).sort(new Comparator<HouseNumberInfo>() {
+                    @Override
+                    public int compare(HouseNumberInfo t1, HouseNumberInfo t2) {
+                        return getHouseNumberInt(t1.number) - getHouseNumberInt(t2.number);
+                    }
+                });
+                lastSorted = i;
+            }
+        return results;
+    }
+
+    String distanceToString(double dist) {
+        if (dist < 1000)
+            return Long.toString(Math.round(dist)) + " m";
+        return Long.toString(Math.round(dist / 1000)) + " km";
+    }
+
+    void addressSearch(StreetInfo street) {
+        LatLong curLocation = mapView.getBoundingBox().getCenterPoint();
+        List<HouseNumberInfo> numbers = getHouseNumbers(street, curLocation);
+        View popupView = getPopupView();
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        List<String> numbersLabels = new ArrayList<>();
+        for (HouseNumberInfo elem : numbers)
+            numbersLabels.add(elem.number + " " + distanceToString(elem.location.sphericalDistance(curLocation)));
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(MainActivity.this, R.layout.categoryelem, numbersLabels);
+        listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                groupLayer = new GroupLayer();
+                Bitmap bitmap = new AndroidBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.marker_green));
+                Marker marker = new MainActivity.MarkerImpl(numbers.get(i).location, bitmap, 0, -bitmap.getHeight() / 2,
+                        street.name + " " + numbers.get(i).number);
+                groupLayer.layers.add(marker);
+                mapView.getLayerManager().getLayers().add(groupLayer);
+                mapView.setCenter(numbers.get(i).location);
+                mapView.getLayerManager().redrawLayers();
+                lockedLocation = false;
+                popupWindow.dismiss();
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+    }
+
+    void addressSearchFuzzy(String streetname) {
+        List<StreetInfo> streets = findStreets(streetname);
+        View popupView = getPopupView();
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        List<String> streetNames = new ArrayList<>();
+        for (StreetInfo elem : streets)
+            streetNames.add(elem.name);
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(MainActivity.this, R.layout.categoryelem, streetNames);
+        listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                addressSearch(streets.get(i));
+                popupWindow.dismiss();
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+    }
+
+    class StreetInfo {
+        StreetInfo(String name, int id, double match) {
+            this.name = name;
+            this.id = id;
+            this.match = match;
+        }
+        String name;
+        int id;
+        double match;
+    }
+
+    String normalize(String s) {
+        s = Normalizer.normalize(s.toLowerCase(), Normalizer.Form.NFKD);
+        s = s.replaceAll("\\p{M}", "");
+        return s;
+    }
+
+    List<StreetInfo> findStreets(String street) {
+        Log.i(TAG, "Searching for " + street);
+        QGram similarity = new QGram(3);
+        List<StreetInfo> results = new ArrayList<>();
+        for (SQLiteDatabase db : poiDatabases) {
+            Cursor c = db.rawQuery("SELECT name, rowid from streets;", null);
+            int nameIndex = c.getColumnIndex("name");
+            int idIndex = c.getColumnIndex("rowid");
+            if (!c.moveToFirst())
+                continue;
+            do {
+                String name = c.getString(nameIndex);
+                results.add(new StreetInfo(name, c.getInt(idIndex), similarity.distance(normalize(street), normalize(name))));
+            } while (c.moveToNext());
+        }
+        results.sort(new Comparator<StreetInfo>() {
+            @Override
+            public int compare(StreetInfo t1, StreetInfo t2) {
+                if (t1.match < t2.match)
+                    return -1;
+                if (t1.match > t2.match)
+                    return 1;
+                return t1.id - t2.id;
+            }
+        });
+        int cnt = 0;
+        for (StreetInfo elem : results) {
+            Log.i(TAG, "Result: " + elem.name + " " + Double.toString(elem.match));
+        }
+        return results;
     }
 
     void streetAction() {
@@ -488,7 +743,7 @@ public class MainActivity extends Activity implements LocationListener {
         builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                new MainActivity.PoiSearchTask(MainActivity.this, input.getText().toString(), true).execute(mapView.getBoundingBox());
+                addressSearchFuzzy(input.getText().toString());
             }
         });
         builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -502,6 +757,7 @@ public class MainActivity extends Activity implements LocationListener {
 
     private GroupLayer groupLayer;
     private List<PoiPersistenceManager> persistenceManager = new ArrayList<>();
+    private List<SQLiteDatabase> poiDatabases = new ArrayList<>();
 
     File getAssetFile(String path) {
         try {
@@ -525,6 +781,33 @@ public class MainActivity extends Activity implements LocationListener {
             if (f.getName().endsWith(".poi")) {
                 Log.i(TAG, "Found POI file: " + f.getAbsolutePath());
                 persistenceManager.add(AndroidPoiPersistenceManagerFactory.getPoiPersistenceManager(f.getAbsolutePath()));
+                poiDatabases.add(SQLiteDatabase.openDatabase(f,
+                        new SQLiteDatabase.OpenParams.Builder().addOpenFlags(SQLiteDatabase.OPEN_READONLY).build()));
+            }
+        }
+    }
+
+    class Track {
+        Track(String name, File file, List<LatLong> points) {
+            this.name = name;
+            this.file = file;
+            this.points = points;
+        }
+        String name;
+        File file;
+        List<LatLong> points;
+    };
+
+    List<Track> tracks;
+    Track currentTrack;
+
+    void reloadTracks() {
+        tracks = new ArrayList<>();
+        File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        for (File f : dir.listFiles()) {
+            if (f.getName().endsWith(".gpx")) {
+                Log.i(TAG, "Found GPX file: " + f.getAbsolutePath());
+                tracks.add(new Track(f.getName().substring(0, f.getName().length() - 4), f, decodeGPX(f)));
             }
         }
     }
@@ -540,12 +823,12 @@ public class MainActivity extends Activity implements LocationListener {
                 dataStore.addMapDataStore(file, false, false);
                 if (Character.isDigit(f.getName().charAt(f.getName().length() - 5)))
                     f.delete();
-            } else if (!f.getName().endsWith(".poi")) {
+            } else if (!f.getName().endsWith(".poi") && !f.getName().endsWith(".gpx")) {
                 Log.i(TAG, "Removing unknown file: " + f.getAbsolutePath());
                 f.delete();
             }
         }
-        dataStore.addMapDataStore(new MapFile(getAssetFile("mapsforge/world.map")), false, false);
+        dataStore.addMapDataStore(new MapFile(getAssetFile("world.map")), false, false);
         return dataStore;
     }
 
@@ -560,7 +843,7 @@ public class MainActivity extends Activity implements LocationListener {
                 return true;
             }
         };
-        tileRendererLayer.setXmlRenderTheme(InternalRenderTheme.DEFAULT);
+        tileRendererLayer.setXmlRenderTheme(new CustomTheme("/assets/default.xml"));
         this.mapView.getLayerManager().getLayers().clear(true);
         this.mapView.getLayerManager().getLayers().add(tileRendererLayer);
         MapDataStoreLabelStore labelStore = new MapDataStoreLabelStore(mapStore, tileRendererLayer.getRenderThemeFuture(),
@@ -569,6 +852,9 @@ public class MainActivity extends Activity implements LocationListener {
         mapView.getLayerManager().getLayers().add(labelLayer);
         this.mapView.getLayerManager().getLayers().add(this.myLocationOverlay);
         reloadPois();
+        if (currentTrack != null)
+            addTrack(mapView.getLayerManager().getLayers(), currentTrack.points);
+        reloadTracks();
     }
 
     private void createLayers() {
@@ -581,7 +867,9 @@ public class MainActivity extends Activity implements LocationListener {
         this.myLocationOverlay = new MyLocationOverlay(marker, circle);
         reloadLayers();
         // create the overlay
-        this.mapView.setBuiltInZoomControls(false);
+        boolean isWatch = getResources().getBoolean(R.bool.watch);
+        if (isWatch)
+            this.mapView.setBuiltInZoomControls(false);
         DefaultMapScaleBar scaleBar = new DefaultMapScaleBar(mapView.getModel().mapViewPosition,
                 mapView.getModel().mapViewDimension,
                 AndroidGraphicFactory.INSTANCE, mapView.getModel().displayModel);
@@ -610,12 +898,6 @@ public class MainActivity extends Activity implements LocationListener {
                 this.locationManager.requestLocationUpdates(provider, 0, 0, this);
             }
         }
-        try {
-            List<LatLong> track = decodeGPX(getAssets().open("mapsforge/track.gpx"));
-            addTrack(mapView.getLayerManager().getLayers(), track);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
         //this.mapView.getModel().displayModel.setFilter(Filter.INVERT);
         this.mapView.getModel().displayModel.setBackgroundColor(0x000000);
     }
@@ -640,13 +922,13 @@ public class MainActivity extends Activity implements LocationListener {
         layers.add(polyline);
     }
 
-    private List<LatLong> decodeGPX(InputStream fileInputStream){
+    private List<LatLong> decodeGPX(File file){
         List<LatLong> list = new ArrayList<LatLong>();
 
         DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
         try {
             DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
-            Document document = documentBuilder.parse(fileInputStream);
+            Document document = documentBuilder.parse(file);
             Element elementRoot = document.getDocumentElement();
 
             NodeList nodelist_trkpt = elementRoot.getElementsByTagName("trkpt");
@@ -662,7 +944,6 @@ public class MainActivity extends Activity implements LocationListener {
                 Double newLongitude_double = Double.parseDouble(newLongitude);
                 list.add(new LatLong(newLatitude_double, newLongitude_double));
             }
-            fileInputStream.close();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -736,9 +1017,46 @@ public class MainActivity extends Activity implements LocationListener {
         return this.getClass().getSimpleName();
     }
 
+    private String queryName(Uri uri) {
+        Cursor returnCursor = getContentResolver().query(uri, null, null, null, null);
+        assert returnCursor != null;
+        int nameIndex = returnCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+        returnCursor.moveToFirst();
+        String name = returnCursor.getString(nameIndex);
+        returnCursor.close();
+        return name;
+    }
+
+    private void tryImportingTrack(Intent intent) {
+        Uri data = intent.getData();
+        if (data != null) {
+            String path = data.getEncodedPath();
+            String name = queryName(data);
+            Log.i(MainActivity.TAG, "Opening " + path);
+            try {
+                {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(getContentResolver().openInputStream(data)));
+                    File target = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), name);
+                    String line;
+                    BufferedWriter out = new BufferedWriter(new FileWriter(target));
+                    while ((line = reader.readLine()) != null) {
+                        out.write(line);
+                        out.newLine();
+                    }
+                    out.close();
+                }
+                Toast.makeText(MainActivity.this, "Imported " + name, Toast.LENGTH_SHORT).show();
+                reloadLayers();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        tryImportingTrack(getIntent());
         AndroidGraphicFactory.createInstance(this);
         this.preferencesFacade = new AndroidPreferences(this.getSharedPreferences(getPersistableId(), MODE_PRIVATE));
         createMapViews();
@@ -750,40 +1068,40 @@ public class MainActivity extends Activity implements LocationListener {
         registerReceiver(downloadReceiver, filter);
     }
 
+
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        tryImportingTrack(intent);
+    }
+
     private class PoiSearchTask extends android.os.AsyncTask<BoundingBox, Void, Collection<PointOfInterest>> {
         private final WeakReference<MainActivity> weakActivity;
         private final String category;
-        private final boolean address;
 
-        private PoiSearchTask(MainActivity activity, String category, boolean address) {
+        private PoiSearchTask(MainActivity activity, String category) {
             this.weakActivity = new WeakReference<>(activity);
             this.category = category;
-            this.address = address;
         }
 
         @Override
         protected Collection<PointOfInterest> doInBackground(BoundingBox... params) {
-            if (address)
-                chooseStreet(category);
-            else {
-                // Search POI
-                List<PointOfInterest> ret = new ArrayList<>();
-                for (PoiPersistenceManager elem : persistenceManager)
-                    try {
-                        PoiCategoryFilter categoryFilter = null;
-                        if (!category.equals("All")) {
-                            PoiCategoryManager categoryManager = elem.getCategoryManager();
-                            categoryFilter = new WhitelistPoiCategoryFilter();
-                            categoryFilter.addCategory(categoryManager.getPoiCategoryByTitle(category));
-                        }
-                        for (PointOfInterest poi : elem.findInRect(params[0], categoryFilter, null, Integer.MAX_VALUE))
-                            ret.add(poi);
-                    } catch (Throwable t) {
-                        Log.e(TAG, t.getMessage(), t);
+            // Search POI
+            List<PointOfInterest> ret = new ArrayList<>();
+            for (PoiPersistenceManager elem : persistenceManager)
+                try {
+                    PoiCategoryFilter categoryFilter = null;
+                    if (!category.equals("All")) {
+                        PoiCategoryManager categoryManager = elem.getCategoryManager();
+                        categoryFilter = new WhitelistPoiCategoryFilter();
+                        categoryFilter.addCategory(categoryManager.getPoiCategoryByTitle(category));
                     }
-                return ret;
-            }
-            return null;
+                    for (PointOfInterest poi : elem.findInRect(params[0], categoryFilter, null, Integer.MAX_VALUE))
+                        ret.add(poi);
+                } catch (Throwable t) {
+                    Log.e(TAG, t.getMessage(), t);
+                }
+            return ret;
         }
 
         @Override
@@ -801,7 +1119,7 @@ public class MainActivity extends Activity implements LocationListener {
             groupLayer = new GroupLayer();
             Bitmap bitmap = new AndroidBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.marker_green));
             for (final PointOfInterest pointOfInterest : pointOfInterests) {
-                Marker marker = new MainActivity.MarkerImpl(pointOfInterest.getLatLong(), bitmap, 0, -bitmap.getHeight() / 2, pointOfInterest);
+                Marker marker = new MainActivity.MarkerImpl(pointOfInterest.getLatLong(), bitmap, 0, -bitmap.getHeight() / 2, pointOfInterest.getCategory().toString());
                 groupLayer.layers.add(marker);
             }
             mapView.getLayerManager().getLayers().add(groupLayer);
@@ -810,21 +1128,23 @@ public class MainActivity extends Activity implements LocationListener {
     }
 
     private class MarkerImpl extends Marker {
-        private final PointOfInterest pointOfInterest;
+        private final String name;
 
-        private MarkerImpl(LatLong latLong, Bitmap bitmap, int horizontalOffset, int verticalOffset, PointOfInterest pointOfInterest) {
+        private MarkerImpl(LatLong latLong, Bitmap bitmap, int horizontalOffset, int verticalOffset, String name) {
             super(latLong, bitmap, horizontalOffset, verticalOffset);
-            this.pointOfInterest = pointOfInterest;
+            this.name = name;
         }
 
         @Override
         public boolean onTap(LatLong tapLatLong, Point layerXY, Point tapXY) {
-            // GroupLayer does not have a position, layerXY is null
-            layerXY = mapView.getMapViewProjection().toPixels(getPosition());
-            if (contains(layerXY, tapXY)) {
-                Toast.makeText(MainActivity.this, pointOfInterest.getName(), Toast.LENGTH_SHORT).show();
-                Log.i(TAG, pointOfInterest.toString());
-                return true;
+            if (name != null) {
+                // GroupLayer does not have a position, layerXY is null
+                layerXY = mapView.getMapViewProjection().toPixels(getPosition());
+                if (contains(layerXY, tapXY)) {
+                    Toast.makeText(MainActivity.this, name, Toast.LENGTH_SHORT).show();
+                    //Log.i(TAG, name);
+                    return true;
+                }
             }
             return false;
         }
