@@ -21,19 +21,30 @@
         android:scaleY="0.6"
         android:background="@color/red"
         android:src="@drawable/ic_action_location_2" />
-    <ImageButton
-        android:id="@+id/searchButton"
+    <LinearLayout
+        android:background="@color/white"
+        android:orientation="vertical"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignLeft="@id/mapView"
         android:layout_alignParentBottom="false"
         android:layout_centerHorizontal="false"
-        android:layout_centerVertical="true"
-        android:layout_marginBottom="4dp"
-        android:scaleX="0.6"
-        android:scaleY="0.6"
-        android:background="@color/translucent"
-        android:src="@drawable/ic_action_search" />
+        android:layout_centerVertical="true">
+    <TextView
+        android:text=""
+        android:textColor="@color/red"
+        android:shadowColor="@color/white"
+        android:id="@+id/distanceLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+        <TextView
+            android:text=""
+            android:textColor="@color/red"
+            android:shadowColor="@color/white"
+            android:id="@+id/distanceTotalLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
     <ImageButton
         android:id="@+id/displayButton"
         android:layout_width="wrap_content"
@@ -49,4 +60,3 @@
         android:src="@drawable/ic_action_sun" />
 
 </RelativeLayout>
-    <!--android:tint="@android:color/red"-->

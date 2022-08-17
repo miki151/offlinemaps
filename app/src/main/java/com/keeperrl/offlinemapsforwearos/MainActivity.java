@@ -35,6 +35,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.PopupWindow;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.view.InputDeviceCompat;
@@ -100,6 +101,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.lang.ref.WeakReference;
 import java.sql.Array;
+import java.text.DecimalFormat;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -152,10 +154,35 @@ public class MainActivity extends Activity implements LocationListener {
 
     private LocationManager locationManager;
     private MyLocationOverlay myLocationOverlay;
+    private MyLocationOverlay gpxLocationOverlay;
     private Location lastLocation = null;
 
     private void setLocation(Location location) {
         this.mapView.setCenter(new LatLong(location.getLatitude(), location.getLongitude()));
+    }
+
+    double getLatLongMult(LatLong position) {
+        return position.vincentyDistance(new LatLong(position.latitude - 0.01, position.longitude)) /
+                position.vincentyDistance(new LatLong(position.latitude, position.longitude - 0.01));
+    }
+
+    LatLong getClosestPoint(LatLong p, LatLong s1, LatLong s2, double mult) {
+        double a = p.latitude - s1.latitude;
+        double b = (p.longitude - s1.longitude) / mult;
+        double c = s2.latitude - s1.latitude;
+        double d = (s2.longitude - s1.longitude) / mult;
+        double lenSq = c * c + d * d;
+        double param;
+        if (lenSq == 0)
+            param = -1;
+        else
+            param = (a * c + b * d) / lenSq;
+        if (param < 0)
+            return s1;
+        else if (param > 1)
+            return s2;
+        else
+            return new LatLong(s1.latitude + param * c, s1.longitude + param * d * mult);
     }
 
     @Override
@@ -168,6 +195,35 @@ public class MainActivity extends Activity implements LocationListener {
             button.setBackgroundColor(getResources().getColor(R.color.blue));
         } else
             button.setBackgroundColor(getResources().getColor(R.color.translucent));
+        if (currentTrack != null) {
+            LatLong myPos = new LatLong(location.getLatitude(), location.getLongitude());
+            double latLongMult = getLatLongMult(myPos);
+            Log.i(TAG, "Lat long mult " + Double.toString(latLongMult));
+            LatLong closest = null;
+            double myDist = 0;
+            double completedDist = 0;
+            double distCounter = 0;
+            for (int i = 1; i < currentTrack.points.size(); ++i) {
+                LatLong p1 = currentTrack.points.get(i - 1);
+                LatLong p2 = currentTrack.points.get(i);
+                LatLong p = getClosestPoint(myPos, p1, p2, latLongMult);
+                double dist = p.vincentyDistance(myPos);
+                if (closest == null || dist < myDist) {
+                    myDist = dist;
+                    closest = p;
+                    Log.i(TAG, "Completed dist " + Double.toString(distCounter) + " " + Double.toString(p1.vincentyDistance(p)));
+                    completedDist = distCounter + p1.vincentyDistance(p);
+                }
+                distCounter += p1.vincentyDistance(p2);
+            }
+            if (closest != null)
+                this.gpxLocationOverlay.setPosition(closest.latitude, closest.longitude, 0);
+            TextView distanceLabel = (TextView) findViewById(R.id.distanceLabel);
+            DecimalFormat df = new DecimalFormat("0.00");
+            distanceLabel.setText(df.format(completedDist / 1000) + " km");
+            TextView distanceTotalLabel = (TextView) findViewById(R.id.distanceTotalLabel);
+            distanceTotalLabel.setText(df.format(currentTrack.length / 1000) + " km");
+        }
     }
 
     private boolean lockedLocation = false;
@@ -198,13 +254,6 @@ public class MainActivity extends Activity implements LocationListener {
                     displayButton.setBackgroundColor(getResources().getColor(R.color.translucent));
                 }
                 displayOn = !displayOn;
-            }
-        });
-        ImageButton searchButton = (ImageButton) findViewById(R.id.searchButton);
-        searchButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                searchAction();
             }
         });
     }
@@ -787,12 +836,21 @@ public class MainActivity extends Activity implements LocationListener {
         }
     }
 
+    static double getTrackLength(List<LatLong> points) {
+        double ret = 0;
+        for (int i = 1; i < points.size(); ++i)
+            ret += points.get(i).vincentyDistance(points.get(i - 1));
+        return ret;
+    }
+
     class Track {
         Track(String name, File file, List<LatLong> points) {
             this.name = name;
             this.file = file;
             this.points = points;
+            this.length = getTrackLength(points);
         }
+        double length;
         String name;
         File file;
         List<LatLong> points;
@@ -851,6 +909,7 @@ public class MainActivity extends Activity implements LocationListener {
         LabelLayer labelLayer = new ThreadedLabelLayer(AndroidGraphicFactory.INSTANCE, labelStore);
         mapView.getLayerManager().getLayers().add(labelLayer);
         this.mapView.getLayerManager().getLayers().add(this.myLocationOverlay);
+        this.mapView.getLayerManager().getLayers().add(this.gpxLocationOverlay);
         reloadPois();
         if (currentTrack != null)
             addTrack(mapView.getLayerManager().getLayers(), currentTrack.points);
@@ -865,6 +924,9 @@ public class MainActivity extends Activity implements LocationListener {
                 getPaint(AndroidGraphicFactory.INSTANCE.createColor(48, 0, 0, 255), 0, Style.FILL),
                 getPaint(AndroidGraphicFactory.INSTANCE.createColor(160, 0, 0, 255), 2, Style.STROKE));
         this.myLocationOverlay = new MyLocationOverlay(marker, circle);
+        Bitmap bitmap2 = new AndroidBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.ic_maps_indicator_track_position));
+        Marker marker2 = new Marker(null, bitmap2, 0, 0);
+        this.gpxLocationOverlay = new MyLocationOverlay(marker2, null);
         reloadLayers();
         // create the overlay
         boolean isWatch = getResources().getBoolean(R.bool.watch);
