@@ -20,6 +20,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.provider.OpenableColumns;
 import android.text.InputType;
 import android.util.Log;
@@ -33,6 +34,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.PopupWindow;
 import android.widget.TextView;
@@ -87,6 +89,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.w3c.dom.Text;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -226,11 +229,54 @@ public class MainActivity extends Activity implements LocationListener {
         }
     }
 
+    private void toggleView(View view) {
+        if (view.getVisibility() == View.GONE)
+            view.setVisibility(View.VISIBLE);
+        else
+            view.setVisibility(View.GONE);
+    }
+
+    @Override
+    public void onBackPressed() {
+        toggleView(findViewById(R.id.timerOverlay));
+        toggleView(findViewById(R.id.trackOverlay));
+    }
+
     private boolean lockedLocation = false;
     private boolean displayOn = false;
+    private Long timerStart = null;
+
+    Handler timerHandler = new Handler();
+    Runnable timerRunnable = new Runnable() {
+        @Override
+        public void run() {
+            TextView timerButton = (TextView) findViewById(R.id.timerLabel);
+            if (timerStart == null)
+                timerButton.setText("00:00");
+            else {
+                long millis = System.currentTimeMillis() - timerStart;
+                int seconds = (int)millis / 1000;
+                int minutes = seconds / 60;
+                seconds = seconds % 60;
+                timerButton.setText(String.format("%d:%02d", minutes, seconds));
+                timerHandler.postDelayed(this, 500);
+            }
+        }
+    };
 
     protected void createControls() {
         initializePosition(mapView.getModel().mapViewPosition);
+        TextView timerButton = (TextView) findViewById(R.id.timerLabel);
+        timerButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (timerStart == null) {
+                    timerStart = System.currentTimeMillis();
+                    timerHandler.postDelayed(timerRunnable, 0);
+                } else
+                    timerStart = null;
+            }
+        });
         ImageButton locationButton = (ImageButton) findViewById(R.id.locationButton);
         locationButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1129,8 +1175,6 @@ public class MainActivity extends Activity implements LocationListener {
         IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         registerReceiver(downloadReceiver, filter);
     }
-
-
 
     @Override
     protected void onNewIntent(Intent intent) {
