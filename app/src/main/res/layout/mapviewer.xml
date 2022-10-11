@@ -21,57 +21,102 @@
         android:scaleY="0.8"
         android:background="@color/red"
         android:src="@drawable/ic_action_location_2" />
+
     <LinearLayout
-        android:orientation="vertical"
         android:id="@+id/timerOverlay"
-        android:visibility="invisible"
-        android:gravity="top|center_horizontal"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-        <TextView
-            android:background="@color/black"
-            android:text="0:00"
+        android:layout_height="match_parent"
+        android:gravity="top|center_horizontal"
+        android:orientation="vertical"
+        android:visibility="invisible">
+
+    <LinearLayout
+        android:id="@+id/timerOverlayInside"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="top|center_horizontal"
+        android:background="@color/black"
+        android:orientation="vertical">
+
+    <TextView
+            android:id="@+id/timerLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:clickable="true"
-            android:textColor="@color/white"
+            android:gravity="center_horizontal"
             android:paddingHorizontal="5sp"
             android:shadowColor="@color/white"
-            android:id="@+id/timerLabel"
-            android:layout_width="wrap_content"
-            android:textSize="28sp"
-            android:layout_height="wrap_content"/>
+            android:text="00:00"
+            android:textColor="@color/white"
+            android:textSize="28sp" />
+
+        <LinearLayout
+            android:id="@+id/timerOverlayUnder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <TextClock
+                android:id="@+id/clockView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:layout_weight="1"
+                android:shadowColor="@color/white"
+                android:text="00:00"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/batteryView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:background="@color/black"
+                android:shadowColor="@color/white"
+                android:text="100%"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+        </LinearLayout>
     </LinearLayout>
+    </LinearLayout>
+
     <LinearLayout
-        android:orientation="vertical"
         android:id="@+id/trackOverlay"
-        android:visibility="invisible"
-        android:gravity="bottom|center_horizontal"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-    <LinearLayout
-        android:background="@color/black"
+        android:layout_height="match_parent"
+        android:gravity="bottom|center_horizontal"
         android:orientation="vertical"
-        android:id="@+id/trackOverlayElem"
-        android:paddingHorizontal="5sp"
-        android:layout_margin="5sp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content">
-        <TextView
-            android:text=""
-            android:textColor="@color/white"
-            android:shadowColor="@color/white"
-            android:id="@+id/distanceLabel"
+        android:visibility="invisible">
+
+        <LinearLayout
+            android:id="@+id/trackOverlayElem"
             android:layout_width="wrap_content"
-            android:textSize="28sp"
-            android:layout_height="wrap_content"/>
-        <TextView
-            android:text=""
-            android:textColor="@color/white"
-            android:shadowColor="@color/white"
-            android:id="@+id/distanceTotalLabel"
-            android:layout_width="wrap_content"
-            android:layout_gravity="center"
-            android:textSize="14sp"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content"
+            android:layout_margin="5sp"
+            android:background="@color/black"
+            android:orientation="vertical"
+            android:paddingHorizontal="5sp">
+
+            <TextView
+                android:id="@+id/distanceLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:shadowColor="@color/white"
+                android:text=""
+                android:textColor="@color/white"
+                android:textSize="28sp" />
+
+            <TextView
+                android:id="@+id/distanceTotalLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:shadowColor="@color/white"
+                android:text=""
+                android:textColor="@color/white"
+                android:textSize="14sp" />
         </LinearLayout>
     </LinearLayout>
     <ImageButton

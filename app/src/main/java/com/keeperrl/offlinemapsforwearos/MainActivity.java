@@ -623,6 +623,15 @@ public class MainActivity extends Activity implements LocationListener {
         }
     };
 
+    private BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            int level = intent.getIntExtra("level", 0);
+            TextView view = (TextView) findViewById(R.id.batteryView);
+            view.setText(Integer.toString(level) + "%");
+        }
+    };
+
     View getPopupView() {
         LayoutInflater layoutInflater =
                 (LayoutInflater)getBaseContext()
@@ -1172,8 +1181,8 @@ public class MainActivity extends Activity implements LocationListener {
         createLayers();
         createControls();
         setTitle(getClass().getSimpleName());
-        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        registerReceiver(downloadReceiver, filter);
+        registerReceiver(downloadReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
     }
 
     @Override
