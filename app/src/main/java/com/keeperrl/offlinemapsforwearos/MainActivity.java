@@ -433,6 +433,8 @@ public class MainActivity extends Activity implements LocationListener {
     }
 
     final DownloadInfo[] allMaps = new DownloadInfo[]{
+            new DownloadInfo("France", ".map",
+                    "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/france.map", 100),
             new DownloadInfo("Sweden", ".map",
                     "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/sweden.map", 100),
             new DownloadInfo("Sweden POI", ".poi",
@@ -926,7 +928,7 @@ public class MainActivity extends Activity implements LocationListener {
     }
 
     MapDataStore getDownloadedMaps() {
-        MultiMapDataStore dataStore = new MultiMapDataStore(MultiMapDataStore.DataPolicy.RETURN_FIRST);
+        MultiMapDataStore dataStore = new MultiMapDataStore(MultiMapDataStore.DataPolicy.RETURN_ALL);
         File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
         for (File f : dir.listFiles()) {
             if (f.getName().endsWith(".map")) {
