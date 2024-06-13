@@ -42,6 +42,7 @@ import android.widget.PopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.view.InputDeviceCompat;
 import androidx.core.view.MotionEventCompat;
@@ -116,6 +117,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -384,7 +386,7 @@ public class MainActivity extends Activity implements LocationListener {
                         popupWindow.dismiss();
                         break;
                     case 1:
-                        downloadMapsAction();
+                        chooseMapGroupAction();
                         break;
                     case 2:
                         break;
@@ -397,16 +399,44 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.showAsDropDown(mapView, 50, -30);
     }
 
+    void chooseMapGroupAction() {
+        LayoutInflater layoutInflater =
+                (LayoutInflater)getBaseContext()
+                        .getSystemService(LAYOUT_INFLATER_SERVICE);
+        View popupView = layoutInflater.inflate(R.layout.categorypopup, null);
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        String[] elems = allMaps.keySet().toArray(new String[0]);
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(MainActivity.this,
+                        R.layout.categoryelem, elems);
+        listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                downloadMapsAction(elems[i]);
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+    }
+    public enum MapDownloadStatus {
+        ABSENT,
+        READY,
+        FETCHING,
+        ERROR
+    }
     private class DownloadInfo {
-        public DownloadInfo(String name, String extension, String url, int size) {
+        public DownloadInfo(String name, String subdir) {
             this.name = name;
-            this.url = url;
-            this.size = size;
-            this.extension = extension;
+            this.url = "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/" + subdir + "/" + name.toLowerCase() + ".map";
         }
 
         public String getFileName() {
-            return name + extension;
+            return name + ".map";
         }
 
         public File getDownloadedPath() {
@@ -421,39 +451,322 @@ public class MainActivity extends Activity implements LocationListener {
             return new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), getTmpName());
         }
 
+        @NonNull
+        public String toString() {
+            switch (status) {
+                case ABSENT: return name;
+                case ERROR: return name + " (error downloading)";
+                case READY: return name + " (ready)";
+                case FETCHING: return name + " (fetching)";
+            }
+            return name;
+        }
+
+        MapDownloadStatus status = MapDownloadStatus.ABSENT;
         String name;
-        String extension;
         String url;
         int size;
     }
 
-    final DownloadInfo[] allMaps = new DownloadInfo[]{
-            new DownloadInfo("France", ".map",
-                    "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/france.map", 100),
-            new DownloadInfo("Sweden", ".map",
-                    "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/sweden.map", 100),
-            new DownloadInfo("Sweden POI", ".poi",
-                    "http://192.168.0.5/~michal/sweden.poi", 100),
-            new DownloadInfo("Poland", ".map",
-                    "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/poland.map", 100),
-            new DownloadInfo("Andorra", ".map",
-                    "http://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/europe/andorra.map", 100)
-    };
+    final Map<String, DownloadInfo[]> allMaps = Map.of(
+            "Africa", new DownloadInfo[]{
+                    new DownloadInfo("algeria", "africa"),
+                    new DownloadInfo("angola", "africa"),
+                    new DownloadInfo("benin", "africa"),
+                    new DownloadInfo("botswana", "africa"),
+                    new DownloadInfo("burkina-faso", "africa"),
+                    new DownloadInfo("burundi", "africa"),
+                    new DownloadInfo("cameroon", "africa"),
+                    new DownloadInfo("canary-islands", "africa"),
+                    new DownloadInfo("cape-verde", "africa"),
+                    new DownloadInfo("central-african-republic", "africa"),
+                    new DownloadInfo("chad", "africa"),
+                    new DownloadInfo("comores", "africa"),
+                    new DownloadInfo("congo-brazzaville", "africa"),
+                    new DownloadInfo("congo-democratic-republic", "africa"),
+                    new DownloadInfo("djibouti", "africa"),
+                    new DownloadInfo("egypt", "africa"),
+                    new DownloadInfo("equatorial-guinea", "africa"),
+                    new DownloadInfo("eritrea", "africa"),
+                    new DownloadInfo("ethiopia", "africa"),
+                    new DownloadInfo("gabon", "africa"),
+                    new DownloadInfo("ghana", "africa"),
+                    new DownloadInfo("guinea-bissau", "africa"),
+                    new DownloadInfo("guinea", "africa"),
+                    new DownloadInfo("ivory-coast", "africa"),
+                    new DownloadInfo("kenya", "africa"),
+                    new DownloadInfo("lesotho", "africa"),
+                    new DownloadInfo("liberia", "africa"),
+                    new DownloadInfo("libya", "africa"),
+                    new DownloadInfo("madagascar", "africa"),
+                    new DownloadInfo("malawi", "africa"),
+                    new DownloadInfo("mali", "africa"),
+                    new DownloadInfo("mauritania", "africa"),
+                    new DownloadInfo("mauritius", "africa"),
+                    new DownloadInfo("morocco", "africa"),
+                    new DownloadInfo("mozambique", "africa"),
+                    new DownloadInfo("namibia", "africa"),
+                    new DownloadInfo("niger", "africa"),
+                    new DownloadInfo("nigeria", "africa"),
+                    new DownloadInfo("rwanda", "africa"),
+                    new DownloadInfo("saint-helena-ascension-and-tristan-da-cunha", "africa"),
+                    new DownloadInfo("sao-tome-and-principe", "africa"),
+                    new DownloadInfo("senegal-and-gambia", "africa"),
+                    new DownloadInfo("seychelles", "africa"),
+                    new DownloadInfo("sierra-leone", "africa"),
+                    new DownloadInfo("somalia", "africa"),
+                    new DownloadInfo("south-africa-and-lesotho", "africa"),
+                    new DownloadInfo("south-sudan", "africa"),
+                    new DownloadInfo("sudan", "africa"),
+                    new DownloadInfo("swaziland", "africa"),
+                    new DownloadInfo("tanzania", "africa"),
+                    new DownloadInfo("togo", "africa"),
+                    new DownloadInfo("tunisia", "africa"),
+                    new DownloadInfo("uganda", "africa"),
+                    new DownloadInfo("zambia", "africa"),
+                    new DownloadInfo("zimbabwe", "africa")
+            },
+            "Europe", new DownloadInfo[]{
+                    new DownloadInfo("albania", "europe"),
+                    new DownloadInfo("alps", "europe"),
+                    new DownloadInfo("andorra", "europe"),
+                    new DownloadInfo("austria", "europe"),
+                    new DownloadInfo("azores", "europe"),
+                    new DownloadInfo("belarus", "europe"),
+                    new DownloadInfo("belgium", "europe"),
+                    new DownloadInfo("bosnia-herzegovina", "europe"),
+                    new DownloadInfo("bulgaria", "europe"),
+                    new DownloadInfo("croatia", "europe"),
+                    new DownloadInfo("cyprus", "europe"),
+                    new DownloadInfo("czech-republic", "europe"),
+                    new DownloadInfo("denmark", "europe"),
+                    new DownloadInfo("estonia", "europe"),
+                    new DownloadInfo("faroe-islands", "europe"),
+                    new DownloadInfo("finland", "europe"),
+                    new DownloadInfo("france", "europe"),
+                    new DownloadInfo("georgia", "europe"),
+                    new DownloadInfo("germany", "europe"),
+                    new DownloadInfo("great-britain", "europe"),
+                    new DownloadInfo("greece", "europe"),
+                    new DownloadInfo("guernsey-jersey", "europe"),
+                    new DownloadInfo("hungary", "europe"),
+                    new DownloadInfo("iceland", "europe"),
+                    new DownloadInfo("ireland-and-northern-ireland", "europe"),
+                    new DownloadInfo("isle-of-man", "europe"),
+                    new DownloadInfo("italy", "europe"),
+                    new DownloadInfo("kosovo", "europe"),
+                    new DownloadInfo("latvia", "europe"),
+                    new DownloadInfo("liechtenstein", "europe"),
+                    new DownloadInfo("lithuania", "europe"),
+                    new DownloadInfo("luxembourg", "europe"),
+                    new DownloadInfo("macedonia", "europe"),
+                    new DownloadInfo("malta", "europe"),
+                    new DownloadInfo("moldova", "europe"),
+                    new DownloadInfo("monaco", "europe"),
+                    new DownloadInfo("montenegro", "europe"),
+                    new DownloadInfo("netherlands", "europe"),
+                    new DownloadInfo("norway", "europe"),
+                    new DownloadInfo("poland", "europe"),
+                    new DownloadInfo("portugal", "europe"),
+                    new DownloadInfo("romania", "europe"),
+                    new DownloadInfo("serbia", "europe"),
+                    new DownloadInfo("slovakia", "europe"),
+                    new DownloadInfo("slovenia", "europe"),
+                    new DownloadInfo("spain", "europe"),
+                    new DownloadInfo("sweden", "europe"),
+                    new DownloadInfo("switzerland", "europe"),
+                    new DownloadInfo("turkey", "europe"),
+                    new DownloadInfo("ukraine", "europe"),
 
+            },
+            "North America", new DownloadInfo[]{
+                    new DownloadInfo("greenland", "north-america"),
+                    new DownloadInfo("mexico", "north-america"),
+                    new DownloadInfo("alabama", "north-america/us"),
+                    new DownloadInfo("alaska", "north-america/us"),
+                    new DownloadInfo("arizona", "north-america/us"),
+                    new DownloadInfo("arkansas", "north-america/us"),
+                    new DownloadInfo("california", "north-america/us"),
+                    new DownloadInfo("colorado", "north-america/us"),
+                    new DownloadInfo("connecticut", "north-america/us"),
+                    new DownloadInfo("delaware", "north-america/us"),
+                    new DownloadInfo("district-of-columbia", "north-america/us"),
+                    new DownloadInfo("florida", "north-america/us"),
+                    new DownloadInfo("georgia", "north-america/us"),
+                    new DownloadInfo("hawaii", "north-america/us"),
+                    new DownloadInfo("idaho", "north-america/us"),
+                    new DownloadInfo("illinois", "north-america/us"),
+                    new DownloadInfo("indiana", "north-america/us"),
+                    new DownloadInfo("iowa", "north-america/us"),
+                    new DownloadInfo("kansas", "north-america/us"),
+                    new DownloadInfo("kentucky", "north-america/us"),
+                    new DownloadInfo("louisiana", "north-america/us"),
+                    new DownloadInfo("maine", "north-america/us"),
+                    new DownloadInfo("maryland", "north-america/us"),
+                    new DownloadInfo("massachusetts", "north-america/us"),
+                    new DownloadInfo("michigan", "north-america/us"),
+                    new DownloadInfo("minnesota", "north-america/us"),
+                    new DownloadInfo("mississippi", "north-america/us"),
+                    new DownloadInfo("missouri", "north-america/us"),
+                    new DownloadInfo("montana", "north-america/us"),
+                    new DownloadInfo("nebraska", "north-america/us"),
+                    new DownloadInfo("nevada", "north-america/us"),
+                    new DownloadInfo("new-hampshire", "north-america/us"),
+                    new DownloadInfo("new-jersey", "north-america/us"),
+                    new DownloadInfo("new-mexico", "north-america/us"),
+                    new DownloadInfo("new-york", "north-america/us"),
+                    new DownloadInfo("north-carolina", "north-america/us"),
+                    new DownloadInfo("north-dakota", "north-america/us"),
+                    new DownloadInfo("ohio", "north-america/us"),
+                    new DownloadInfo("oklahoma", "north-america/us"),
+                    new DownloadInfo("oregon", "north-america/us"),
+                    new DownloadInfo("pennsylvania", "north-america/us"),
+                    new DownloadInfo("puerto-rico", "north-america/us"),
+                    new DownloadInfo("rhode-island", "north-america/us"),
+                    new DownloadInfo("south-carolina", "north-america/us"),
+                    new DownloadInfo("south-dakota", "north-america/us"),
+                    new DownloadInfo("tennessee", "north-america/us"),
+                    new DownloadInfo("texas", "north-america/us"),
+                    new DownloadInfo("us-virgin-islands", "north-america/us"),
+                    new DownloadInfo("utah", "north-america/us"),
+                    new DownloadInfo("vermont", "north-america/us"),
+                    new DownloadInfo("virginia", "north-america/us"),
+                    new DownloadInfo("washington", "north-america/us"),
+                    new DownloadInfo("west-virginia", "north-america/us"),
+                    new DownloadInfo("wisconsin", "north-america/us"),
+                    new DownloadInfo("wyoming", "north-america/us"),
+                    new DownloadInfo("alberta", "north-america/canada"),
+                    new DownloadInfo("british-columbia", "north-america/canada"),
+                    new DownloadInfo("manitoba", "north-america/canada"),
+                    new DownloadInfo("new-brunswick", "north-america/canada"),
+                    new DownloadInfo("newfoundland-and-labrador", "north-america/canada"),
+                    new DownloadInfo("northwest-territories", "north-america/canada"),
+                    new DownloadInfo("nova-scotia", "north-america/canada"),
+                    new DownloadInfo("nunavut", "north-america/canada"),
+                    new DownloadInfo("ontario", "north-america/canada"),
+                    new DownloadInfo("prince-edward-island", "north-america/canada"),
+                    new DownloadInfo("quebec", "north-america/canada"),
+                    new DownloadInfo("saskatchewan", "north-america/canada"),
+                    new DownloadInfo("yukon", "north-america/canada"),
+            },
+            "Asia", new DownloadInfo[]{
+                    new DownloadInfo("afghanistan", "asia"),
+                    new DownloadInfo("armenia", "asia"),
+                    new DownloadInfo("azerbaijan", "asia"),
+                    new DownloadInfo("bangladesh", "asia"),
+                    new DownloadInfo("bhutan", "asia"),
+                    new DownloadInfo("cambodia", "asia"),
+                    new DownloadInfo("china", "asia"),
+                    new DownloadInfo("east-timor", "asia"),
+                    new DownloadInfo("gcc-states", "asia"),
+                    new DownloadInfo("india", "asia"),
+                    new DownloadInfo("indonesia", "asia"),
+                    new DownloadInfo("iran", "asia"),
+                    new DownloadInfo("iraq", "asia"),
+                    new DownloadInfo("israel-and-palestine", "asia"),
+                    new DownloadInfo("japan", "asia"),
+                    new DownloadInfo("jordan", "asia"),
+                    new DownloadInfo("kazakhstan", "asia"),
+                    new DownloadInfo("kyrgyzstan", "asia"),
+                    new DownloadInfo("laos", "asia"),
+                    new DownloadInfo("lebanon", "asia"),
+                    new DownloadInfo("malaysia-singapore-brunei", "asia"),
+                    new DownloadInfo("maldives", "asia"),
+                    new DownloadInfo("mongolia", "asia"),
+                    new DownloadInfo("myanmar", "asia"),
+                    new DownloadInfo("nepal", "asia"),
+                    new DownloadInfo("north-korea", "asia"),
+                    new DownloadInfo("pakistan", "asia"),
+                    new DownloadInfo("philippines", "asia"),
+                    new DownloadInfo("south-korea", "asia"),
+                    new DownloadInfo("sri-lanka", "asia"),
+                    new DownloadInfo("syria", "asia"),
+                    new DownloadInfo("taiwan", "asia"),
+                    new DownloadInfo("tajikistan", "asia"),
+                    new DownloadInfo("thailand", "asia"),
+                    new DownloadInfo("turkmenistan", "asia"),
+                    new DownloadInfo("uzbekistan", "asia"),
+                    new DownloadInfo("vietnam", "asia"),
+                    new DownloadInfo("yemen", "asia"),
+            },
+            "Australia-Oceania", new DownloadInfo[]{
+                    new DownloadInfo("american-oceania", "australia-oceania"),
+                    new DownloadInfo("australia", "australia-oceania"),
+                    new DownloadInfo("cook-islands", "australia-oceania"),
+                    new DownloadInfo("fiji", "australia-oceania"),
+                    new DownloadInfo("ile-de-clipperton", "australia-oceania"),
+                    new DownloadInfo("kiribati", "australia-oceania"),
+                    new DownloadInfo("marshall-islands", "australia-oceania"),
+                    new DownloadInfo("micronesia", "australia-oceania"),
+                    new DownloadInfo("nauru", "australia-oceania"),
+                    new DownloadInfo("new-caledonia", "australia-oceania"),
+                    new DownloadInfo("new-zealand", "australia-oceania"),
+                    new DownloadInfo("niue", "australia-oceania"),
+                    new DownloadInfo("palau", "australia-oceania"),
+                    new DownloadInfo("papua-new-guinea", "australia-oceania"),
+                    new DownloadInfo("pitcairn-islands", "australia-oceania"),
+                    new DownloadInfo("polynesie-francaise", "australia-oceania"),
+                    new DownloadInfo("samoa", "australia-oceania"),
+                    new DownloadInfo("solomon-islands", "australia-oceania"),
+                    new DownloadInfo("tokelau", "australia-oceania"),
+                    new DownloadInfo("tonga", "australia-oceania"),
+                    new DownloadInfo("tuvalu", "australia-oceania"),
+                    new DownloadInfo("vanuatu", "australia-oceania"),
+                    new DownloadInfo("wallis-et-futuna", "australia-oceania"),
+            },
+            "Central America", new DownloadInfo[]{
+                    new DownloadInfo("bahamas", "central-america"),
+                    new DownloadInfo("belize", "central-america"),
+                    new DownloadInfo("costa-rica", "central-america"),
+                    new DownloadInfo("cuba", "central-america"),
+                    new DownloadInfo("el-salvador", "central-america"),
+                    new DownloadInfo("guatemala", "central-america"),
+                    new DownloadInfo("haiti-and-domrep", "central-america"),
+                    new DownloadInfo("honduras", "central-america"),
+                    new DownloadInfo("jamaica", "central-america"),
+                    new DownloadInfo("nicaragua", "central-america"),
+                    new DownloadInfo("panama", "central-america"),
+            },
+            "South America", new DownloadInfo[]{
+                    new DownloadInfo("argentina", "south-america"),
+                    new DownloadInfo("bolivia", "south-america"),
+                    new DownloadInfo("brazil", "south-america"),
+                    new DownloadInfo("chile", "south-america"),
+                    new DownloadInfo("colombia", "south-america"),
+                    new DownloadInfo("ecuador", "south-america"),
+                    new DownloadInfo("guyana", "south-america"),
+                    new DownloadInfo("paraguay", "south-america"),
+                    new DownloadInfo("peru", "south-america"),
+                    new DownloadInfo("suriname", "south-america"),
+                    new DownloadInfo("uruguay", "south-america"),
+                    new DownloadInfo("venezuela", "south-america"),
+            }
+            );
 
-    private int getMapIndex(String name) {
-        for (int i = 0; i < allMaps.length; ++i)
-            if (allMaps[i].getTmpName().equals(name))
-                return i;
+    static class MapIndex {
+        public String group;
+        public int index;
+
+        public MapIndex(String group, int i) {
+            this.group = group;
+            this.index = i;
+        }
+    }
+
+    DownloadInfo getMap(MapIndex index) {
+        return allMaps.get(index.group)[index.index];
+    }
+    private MapIndex getMapIndex(String name) {
+        for (String group : allMaps.keySet())
+            for (int i = 0; i < allMaps.get(group).length; ++i)
+                if (allMaps.get(group)[i].getTmpName().equals(name))
+                    return new MapIndex(group, i);
         throw new RuntimeException("Bad map name: " + name);
     }
 
-    StringBuffer[] labels = null;
     ArrayAdapter mapDownloadsAdapter;
-    HashMap<Integer, Long> fetching;
-    Set<Integer> ready;
 
-    void downloadMapsAction() {
+    void downloadMapsAction(String group) {
         LayoutInflater layoutInflater =
                 (LayoutInflater)getBaseContext()
                         .getSystemService(LAYOUT_INFLATER_SERVICE);
@@ -466,15 +779,10 @@ public class MainActivity extends Activity implements LocationListener {
         ListView listView = (ListView)popupView.findViewById(R.id.categories);
         DownloadManager.Query q = new DownloadManager.Query();
         q.setFilterByStatus(DownloadManager.STATUS_RUNNING);
-        labels = new StringBuffer[allMaps.length];
-        for (int i = 0; i < allMaps.length; ++i)
-            labels[i] = new StringBuffer(allMaps[i].name);
-        ready = new HashSet<Integer>();
-        fetching = new HashMap<Integer, Long>();
-        for (int i = 0; i < allMaps.length; ++i) {
-            if (allMaps[i].getDownloadedPath().exists()) {
-                ready.add(i);
-                labels[i].append("[Ready]");
+        DownloadInfo[] chosenMaps = allMaps.get(group);
+        for (int i = 0; i < chosenMaps.length; ++i) {
+            if (chosenMaps[i].getDownloadedPath().exists()) {
+                chosenMaps[i].status = MapDownloadStatus.READY;
             }
         }
         DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
@@ -484,35 +792,31 @@ public class MainActivity extends Activity implements LocationListener {
                 String uri = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_URI));
                 String path = cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
                 long id = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_ID));
-                for (int i = 0; i < allMaps.length; ++i)
-                    if (allMaps[i].url.equals(uri)) {
-                        Log.i(TAG, "Fetching " + allMaps[i].name + " to " + path);
-                        labels[i].replace(0, 100000, allMaps[i].name + " [Fetching]");
-                        fetching.put(i, id);
+                for (int i = 0; i < chosenMaps.length; ++i)
+                    if (chosenMaps[i].url.equals(uri)) {
+                        chosenMaps[i].status = MapDownloadStatus.FETCHING;
                     }
             } while (cursor.moveToNext());
         }
-        mapDownloadsAdapter = new ArrayAdapter<StringBuffer>(MainActivity.this,
-                R.layout.categoryelem, labels);
+        mapDownloadsAdapter = new ArrayAdapter<DownloadInfo>(MainActivity.this,
+                R.layout.categoryelem, chosenMaps);
         listView.setAdapter(mapDownloadsAdapter);
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                if (fetching.containsKey(i)) {
+                if (chosenMaps[i].status == MapDownloadStatus.FETCHING) {
                     Intent intent = new Intent();
                     intent.setAction(DownloadManager.ACTION_VIEW_DOWNLOADS);
                     startActivity(intent);
                 } else
-                if (ready.contains(i)) {
+                if (chosenMaps[i].status == MapDownloadStatus.READY) {
                     multiMenu(Arrays.asList("Erase file"), Arrays.asList(new Runnable() {
                         @Override
                         public void run() {
-                            confirmationDialog("Erase " + allMaps[i].name + "?", new Runnable() {
+                            confirmationDialog("Erase " + chosenMaps[i].name + "?", new Runnable() {
                                         @Override
                                         public void run() {
-                                            allMaps[i].getDownloadedPath().delete();
-                                            ready.remove(i);
-                                            labels[i].replace(0, 100000, allMaps[i].name);
+                                            chosenMaps[i].getDownloadedPath().delete();
                                             mapDownloadsAdapter.notifyDataSetChanged();
                                             popupWindow.dismiss();
                                             reloadLayers();
@@ -521,8 +825,7 @@ public class MainActivity extends Activity implements LocationListener {
                         }
                     }));
                 } else {
-                    downloadMap(i, allMaps[i].url);
-                    labels[i].replace(0, 100000, allMaps[i].name + " [Fetching]");
+                    downloadMap(chosenMaps[i]);
                     mapDownloadsAdapter.notifyDataSetChanged();
                 }
             }
@@ -569,21 +872,22 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.showAsDropDown(mapView, 50, -30);
     }
 
-    void downloadMap(int index, String url) {
+    void downloadMap(DownloadInfo map) {
         DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
-        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(map.url));
         //Set whether this download may proceed over a roaming connection.
         request.setAllowedOverRoaming(false);
         //Set the title of this download, to be displayed in notifications (if enabled).
-        request.setTitle("Offline map download (" + allMaps[index].name + ")");
+        request.setTitle("Offline map download (" + map.name + ")");
         //Set a description of this download, to be displayed in notifications (if enabled)
         request.setDescription("");
         //Set the local destination for the downloaded file to a path within the application's external files directory
-        File target = allMaps[index].getTmpPath();
+        File target = map.getTmpPath();
         if (target.exists())
             target.delete();
-        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, allMaps[index].getTmpName());
+        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, map.getTmpName());
         downloadManager.enqueue(request);
+        map.status = MapDownloadStatus.FETCHING;
         //Enqueue a new download and same the referenceId
         //downloadReference = downloadManager.enqueue(request);
     }
@@ -599,20 +903,18 @@ public class MainActivity extends Activity implements LocationListener {
             if (cursor.moveToFirst()) {
                 String path = Uri.parse(cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI))).getPath();
                 File file = new File(path);
-                int mapIndex = getMapIndex(file.getName());
+                MapIndex mapIndex = getMapIndex(file.getName());
+                DownloadInfo map = getMap(mapIndex);
                 int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
                 if (status == DownloadManager.STATUS_FAILED) {
-                    labels[mapIndex].replace(0, 100000, allMaps[mapIndex].name);
-                    fetching.remove(mapIndex);
+                    map.status = MapDownloadStatus.ERROR;
                     mapDownloadsAdapter.notifyDataSetChanged();
                 }
                 if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                    file.renameTo(allMaps[mapIndex].getDownloadedPath());
-                    Log.i(TAG, "Downloaded map:" + allMaps[mapIndex].name);
-                    Toast.makeText(MainActivity.this, "Download is ready: " + allMaps[mapIndex].name, Toast.LENGTH_SHORT).show();
-                    labels[mapIndex].replace(0, 100000, allMaps[mapIndex].name + " [Ready]");
-                    fetching.remove(mapIndex);
-                    ready.add(mapIndex);
+                    file.renameTo(map.getDownloadedPath());
+//                    Log.i(TAG, "Downloaded map:" + allMaps[mapIndex].name);
+//                    Toast.makeText(MainActivity.this, "Download is ready: " + allMaps[mapIndex].name, Toast.LENGTH_SHORT).show();
+                    map.status = MapDownloadStatus.READY;
                     mapDownloadsAdapter.notifyDataSetChanged();
                     reloadLayers();
                 }
