@@ -370,7 +370,7 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.setOutsideTouchable(true);
         popupWindow.setFocusable(true);
         ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        String[] elems = new String[]{"Find address", "Show POIs", "Tracks", "Download maps", "Settings"};
+        String[] elems = new String[]{"Tracks", "Download maps", "Settings"};
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<String>(MainActivity.this,
                         R.layout.categoryelem, elems);
@@ -380,21 +380,13 @@ public class MainActivity extends Activity implements LocationListener {
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 switch (i) {
                     case 0:
-                        streetAction();
-                        popupWindow.dismiss();
-                        break;
-                    case 1:
-                        searchAction();
-                        popupWindow.dismiss();
-                        break;
-                    case 2:
                         tracksMenu();
                         popupWindow.dismiss();
                         break;
-                    case 3:
+                    case 1:
                         downloadMapsAction();
                         break;
-                    case 4:
+                    case 2:
                         break;
                     default:
                         throw new RuntimeException("Unknown menu item: " + Integer.toString(i));
@@ -637,236 +629,7 @@ public class MainActivity extends Activity implements LocationListener {
         }
     };
 
-    View getPopupView() {
-        LayoutInflater layoutInflater =
-                (LayoutInflater)getBaseContext()
-                        .getSystemService(LAYOUT_INFLATER_SERVICE);
-        return layoutInflater.inflate(R.layout.categorypopup, null);
-    }
-
-    void searchAction() {
-        if (groupLayer != null) {
-            mapView.getLayerManager().getLayers().remove(groupLayer);
-        }
-        View popupView = getPopupView();
-        final PopupWindow popupWindow = new PopupWindow(
-                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
-        popupWindow.setOutsideTouchable(true);
-        popupWindow.setFocusable(true);
-        ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        String[] elems = new String[]{"Food", "Shop", "Health care", "Public Transport", "Sport", "Tourism", "Natural", "Historic", "Emergency", "Playgrounds", "Bad weather shelters", "All"};
-        ArrayAdapter<String> adapter =
-                new ArrayAdapter<String>(MainActivity.this, R.layout.categoryelem, elems);
-        listView.setAdapter(adapter);
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                mapView.getLayerManager().redrawLayers();
-                // POI search
-                new MainActivity.PoiSearchTask(MainActivity.this, elems[i]).execute(mapView.getBoundingBox());
-                Log.i(TAG, "Selected " + elems[i] + " " + Integer.toString(i) + " " + Long.toString(l));
-                popupWindow.dismiss();
-            }
-        });
-        popupWindow.showAsDropDown(mapView, 50, -30);
-    }
-
-    class HouseNumberInfo {
-        HouseNumberInfo(String number, LatLong location) {
-            this.number = number;
-            this.location = location;
-        }
-        String number;
-        LatLong location;
-    }
-
-    int getHouseNumberInt(String number) {
-        int ret = 0;
-        String s = number.trim();
-        while (!s.isEmpty() && Character.isDigit(s.charAt(0))) {
-            ret = ret * 10 + Character.digit(s.charAt(0), 10);
-            s = s.substring(1);
-        }
-        return ret;
-    }
-
-    List<HouseNumberInfo> getHouseNumbers(StreetInfo street, LatLong curLocation) {
-        List<HouseNumberInfo> results = new ArrayList<>();
-        for (SQLiteDatabase db : poiDatabases) {
-            Cursor c = db.rawQuery("SELECT lat, lon, number from house_numbers where street_id=" + street.id + ";", null);
-            int latIndex = c.getColumnIndex("lat");
-            int lonIndex = c.getColumnIndex("lon");
-            int numberIndex = c.getColumnIndex("number");
-            if (!c.moveToFirst())
-                continue;
-            do {
-                results.add(new HouseNumberInfo(c.getString(numberIndex), new LatLong(
-                        c.getDouble(latIndex), c.getDouble(lonIndex))));
-            } while (c.moveToNext());
-        }
-        results.sort(new Comparator<HouseNumberInfo>() {
-            @Override
-            public int compare(HouseNumberInfo t1, HouseNumberInfo t2) {
-                double d1 = curLocation.sphericalDistance(t1.location);
-                double d2 = curLocation.sphericalDistance(t2.location);
-                return Double.compare(d1, d2);
-            }
-        });
-        int lastSorted = 0;
-        for (int i = 1; i <= results.size(); ++i)
-            if (i == results.size() || (i - lastSorted > 1 && results.get(i - 1).location.sphericalDistance(results.get(i).location) > 5000)) {
-                results.subList(lastSorted, i).sort(new Comparator<HouseNumberInfo>() {
-                    @Override
-                    public int compare(HouseNumberInfo t1, HouseNumberInfo t2) {
-                        return getHouseNumberInt(t1.number) - getHouseNumberInt(t2.number);
-                    }
-                });
-                lastSorted = i;
-            }
-        return results;
-    }
-
-    String distanceToString(double dist) {
-        if (dist < 1000)
-            return Long.toString(Math.round(dist)) + " m";
-        return Long.toString(Math.round(dist / 1000)) + " km";
-    }
-
-    void addressSearch(StreetInfo street) {
-        LatLong curLocation = mapView.getBoundingBox().getCenterPoint();
-        List<HouseNumberInfo> numbers = getHouseNumbers(street, curLocation);
-        View popupView = getPopupView();
-        final PopupWindow popupWindow = new PopupWindow(
-                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
-        popupWindow.setOutsideTouchable(true);
-        popupWindow.setFocusable(true);
-        ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        List<String> numbersLabels = new ArrayList<>();
-        for (HouseNumberInfo elem : numbers)
-            numbersLabels.add(elem.number + " " + distanceToString(elem.location.sphericalDistance(curLocation)));
-        ArrayAdapter<String> adapter =
-                new ArrayAdapter<String>(MainActivity.this, R.layout.categoryelem, numbersLabels);
-        listView.setAdapter(adapter);
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                groupLayer = new GroupLayer();
-                Bitmap bitmap = new AndroidBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.marker_green));
-                Marker marker = new MainActivity.MarkerImpl(numbers.get(i).location, bitmap, 0, -bitmap.getHeight() / 2,
-                        street.name + " " + numbers.get(i).number);
-                groupLayer.layers.add(marker);
-                mapView.getLayerManager().getLayers().add(groupLayer);
-                mapView.setCenter(numbers.get(i).location);
-                mapView.getLayerManager().redrawLayers();
-                lockedLocation = false;
-                popupWindow.dismiss();
-            }
-        });
-        popupWindow.showAsDropDown(mapView, 50, -30);
-    }
-
-    void addressSearchFuzzy(String streetname) {
-        List<StreetInfo> streets = findStreets(streetname);
-        View popupView = getPopupView();
-        final PopupWindow popupWindow = new PopupWindow(
-                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
-        popupWindow.setOutsideTouchable(true);
-        popupWindow.setFocusable(true);
-        ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        List<String> streetNames = new ArrayList<>();
-        for (StreetInfo elem : streets)
-            streetNames.add(elem.name);
-        ArrayAdapter<String> adapter =
-                new ArrayAdapter<String>(MainActivity.this, R.layout.categoryelem, streetNames);
-        listView.setAdapter(adapter);
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                addressSearch(streets.get(i));
-                popupWindow.dismiss();
-            }
-        });
-        popupWindow.showAsDropDown(mapView, 50, -30);
-    }
-
-    class StreetInfo {
-        StreetInfo(String name, int id, double match) {
-            this.name = name;
-            this.id = id;
-            this.match = match;
-        }
-        String name;
-        int id;
-        double match;
-    }
-
-    String normalize(String s) {
-        s = Normalizer.normalize(s.toLowerCase(), Normalizer.Form.NFKD);
-        s = s.replaceAll("\\p{M}", "");
-        return s;
-    }
-
-    List<StreetInfo> findStreets(String street) {
-        Log.i(TAG, "Searching for " + street);
-        QGram similarity = new QGram(3);
-        List<StreetInfo> results = new ArrayList<>();
-        for (SQLiteDatabase db : poiDatabases) {
-            Cursor c = db.rawQuery("SELECT name, rowid from streets;", null);
-            int nameIndex = c.getColumnIndex("name");
-            int idIndex = c.getColumnIndex("rowid");
-            if (!c.moveToFirst())
-                continue;
-            do {
-                String name = c.getString(nameIndex);
-                results.add(new StreetInfo(name, c.getInt(idIndex), similarity.distance(normalize(street), normalize(name))));
-            } while (c.moveToNext());
-        }
-        results.sort(new Comparator<StreetInfo>() {
-            @Override
-            public int compare(StreetInfo t1, StreetInfo t2) {
-                if (t1.match < t2.match)
-                    return -1;
-                if (t1.match > t2.match)
-                    return 1;
-                return t1.id - t2.id;
-            }
-        });
-        int cnt = 0;
-        for (StreetInfo elem : results) {
-            Log.i(TAG, "Result: " + elem.name + " " + Double.toString(elem.match));
-        }
-        return results;
-    }
-
-    void streetAction() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Title");
-
-// Set up the input
-        final EditText input = new EditText(this);
-// Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        builder.setView(input);
-
-// Set up the buttons
-        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                addressSearchFuzzy(input.getText().toString());
-            }
-        });
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();
-            }
-        });
-        builder.show();
-    }
-
-    private GroupLayer groupLayer;
     private List<PoiPersistenceManager> persistenceManager = new ArrayList<>();
-    private List<SQLiteDatabase> poiDatabases = new ArrayList<>();
 
     File getAssetFile(String path) {
         try {
@@ -884,17 +647,6 @@ public class MainActivity extends Activity implements LocationListener {
         }
     }
 
-    void reloadPois() {
-        File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-        for (File f : dir.listFiles()) {
-            if (f.getName().endsWith(".poi")) {
-                Log.i(TAG, "Found POI file: " + f.getAbsolutePath());
-                persistenceManager.add(AndroidPoiPersistenceManagerFactory.getPoiPersistenceManager(f.getAbsolutePath()));
-                poiDatabases.add(SQLiteDatabase.openDatabase(f,
-                        new SQLiteDatabase.OpenParams.Builder().addOpenFlags(SQLiteDatabase.OPEN_READONLY).build()));
-            }
-        }
-    }
 
     static double getTrackLength(List<LatLong> points) {
         double ret = 0;
@@ -970,7 +722,6 @@ public class MainActivity extends Activity implements LocationListener {
         mapView.getLayerManager().getLayers().add(labelLayer);
         this.mapView.getLayerManager().getLayers().add(this.myLocationOverlay);
         this.mapView.getLayerManager().getLayers().add(this.gpxLocationOverlay);
-        reloadPois();
         if (currentTrack != null)
             addTrack(mapView.getLayerManager().getLayers(), currentTrack.points);
         reloadTracks();
@@ -1237,83 +988,4 @@ public class MainActivity extends Activity implements LocationListener {
         registerReceiver(downloadReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
         registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
     }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        tryImportingTrack(intent);
-    }
-
-    private class PoiSearchTask extends android.os.AsyncTask<BoundingBox, Void, Collection<PointOfInterest>> {
-        private final WeakReference<MainActivity> weakActivity;
-        private final String category;
-
-        private PoiSearchTask(MainActivity activity, String category) {
-            this.weakActivity = new WeakReference<>(activity);
-            this.category = category;
-        }
-
-        @Override
-        protected Collection<PointOfInterest> doInBackground(BoundingBox... params) {
-            // Search POI
-            List<PointOfInterest> ret = new ArrayList<>();
-            for (PoiPersistenceManager elem : persistenceManager)
-                try {
-                    PoiCategoryFilter categoryFilter = null;
-                    if (!category.equals("All")) {
-                        PoiCategoryManager categoryManager = elem.getCategoryManager();
-                        categoryFilter = new WhitelistPoiCategoryFilter();
-                        categoryFilter.addCategory(categoryManager.getPoiCategoryByTitle(category));
-                    }
-                    for (PointOfInterest poi : elem.findInRect(params[0], categoryFilter, null, Integer.MAX_VALUE))
-                        ret.add(poi);
-                } catch (Throwable t) {
-                    Log.e(TAG, t.getMessage(), t);
-                }
-            return ret;
-        }
-
-        @Override
-        protected void onPostExecute(Collection<PointOfInterest> pointOfInterests) {
-            final MainActivity activity = weakActivity.get();
-            if (activity == null) {
-                return;
-            }
-            Toast.makeText(activity, category + ": " + (pointOfInterests != null ? pointOfInterests.size() : 0), Toast.LENGTH_SHORT).show();
-            if (pointOfInterests == null) {
-                return;
-            }
-
-            // Overlay POI
-            groupLayer = new GroupLayer();
-            Bitmap bitmap = new AndroidBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.marker_green));
-            for (final PointOfInterest pointOfInterest : pointOfInterests) {
-                Marker marker = new MainActivity.MarkerImpl(pointOfInterest.getLatLong(), bitmap, 0, -bitmap.getHeight() / 2, pointOfInterest.getCategory().toString());
-                groupLayer.layers.add(marker);
-            }
-            mapView.getLayerManager().getLayers().add(groupLayer);
-            mapView.getLayerManager().redrawLayers();
-        }
-    }
-
-    private class MarkerImpl extends Marker {
-        private final String name;
-
-        private MarkerImpl(LatLong latLong, Bitmap bitmap, int horizontalOffset, int verticalOffset, String name) {
-            super(latLong, bitmap, horizontalOffset, verticalOffset);
-            this.name = name;
-        }
-
-        @Override
-        public boolean onTap(LatLong tapLatLong, Point layerXY, Point tapXY) {
-            if (name != null) {
-                // GroupLayer does not have a position, layerXY is null
-                layerXY = mapView.getMapViewProjection().toPixels(getPosition());
-                if (contains(layerXY, tapXY)) {
-                    Toast.makeText(MainActivity.this, name, Toast.LENGTH_SHORT).show();
-                    //Log.i(TAG, name);
-                    return true;
-                }
-            }
-            return false;
-        }
-    }}
+}
