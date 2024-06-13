@@ -1,6 +1,7 @@
 
 package com.keeperrl.offlinemapsforwearos;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
@@ -10,6 +11,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.BitmapFactory;
@@ -40,6 +42,7 @@ import android.widget.PopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.app.ActivityCompat;
 import androidx.core.view.InputDeviceCompat;
 import androidx.core.view.MotionEventCompat;
 
@@ -1011,15 +1014,63 @@ public class MainActivity extends Activity implements LocationListener {
             public void onZoomEvent() {
             }
         });
-        for (String provider : this.locationManager.getProviders(true)) {
-            if (LocationManager.GPS_PROVIDER.equals(provider)
-                    || LocationManager.NETWORK_PROVIDER.equals(provider)) {
-                this.locationManager.requestLocationUpdates(provider, 0, 0, this);
-            }
-        }
+        subscribeToLocation();
         //this.mapView.getModel().displayModel.setFilter(Filter.INVERT);
         this.mapView.getModel().displayModel.setBackgroundColor(0x000000);
     }
+
+    void subscribeToLocation() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.i(MainActivity.TAG, "No location permission");
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.ACCESS_FINE_LOCATION)) {
+                Log.i(MainActivity.TAG, "Explaining");
+                showExplanation("Permission Needed", "Rationale", Manifest.permission.ACCESS_FINE_LOCATION, REQUEST_PERMISSION_GPS_STATE);
+            } else {
+                requestPermission(Manifest.permission.ACCESS_FINE_LOCATION, REQUEST_PERMISSION_GPS_STATE);
+                Log.i(MainActivity.TAG, "Requesting");
+            }
+        } else {
+            Log.i(MainActivity.TAG, "Have location permission");
+            for (String provider : this.locationManager.getProviders(true)) {
+                if (LocationManager.GPS_PROVIDER.equals(provider)
+                        || LocationManager.NETWORK_PROVIDER.equals(provider)) {
+                    this.locationManager.requestLocationUpdates(provider, 0, 0, this);
+                }
+            }
+        }
+    }
+
+    private void requestPermission(String permissionName, int permissionRequestCode) {
+        ActivityCompat.requestPermissions(this,
+                new String[]{permissionName}, permissionRequestCode);
+    }
+
+    private void showExplanation(String title,
+                                 String message,
+                                 final String permission,
+                                 final int permissionRequestCode) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        requestPermission(permission, permissionRequestCode);
+                    }
+                });
+        builder.create().show();
+    }
+
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        switch (requestCode) {
+            case REQUEST_PERMISSION_GPS_STATE:
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
+                    subscribeToLocation();
+                break;
+        }
+    }
+
+    private final int REQUEST_PERMISSION_GPS_STATE=1;
 
     static Paint createPaint(int color, int strokeWidth, Style style) {
         Paint paint = AndroidGraphicFactory.INSTANCE.createPaint();
