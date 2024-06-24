@@ -28,10 +28,12 @@ import android.text.InputType;
 import android.util.Log;
 import android.util.Pair;
 import android.view.Display;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.MimeTypeMap;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -39,6 +41,7 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.PopupWindow;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,6 +49,10 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.view.InputDeviceCompat;
 import androidx.core.view.MotionEventCompat;
+import androidx.documentfile.provider.DocumentFile;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import org.mapsforge.core.graphics.Bitmap;
 import org.mapsforge.core.graphics.Color;
@@ -82,18 +89,13 @@ import org.mapsforge.map.scalebar.DefaultMapScaleBar;
 import org.mapsforge.map.scalebar.MapScaleBar;
 import org.mapsforge.map.scalebar.MetricUnitAdapter;
 import org.mapsforge.map.view.InputListener;
-import org.mapsforge.poi.android.storage.AndroidPoiPersistenceManagerFactory;
-import org.mapsforge.poi.storage.PoiCategoryFilter;
-import org.mapsforge.poi.storage.PoiCategoryManager;
-import org.mapsforge.poi.storage.PoiPersistenceManager;
-import org.mapsforge.poi.storage.PointOfInterest;
-import org.mapsforge.poi.storage.WhitelistPoiCategoryFilter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
+import org.xml.sax.SAXException;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -119,9 +121,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import info.debatty.java.stringsimilarity.Levenshtein;
 import info.debatty.java.stringsimilarity.NGram;
@@ -219,7 +224,7 @@ public class MainActivity extends Activity implements LocationListener {
                 if (closest == null || dist < myDist) {
                     myDist = dist;
                     closest = p;
-                    Log.i(TAG, "Completed dist " + Double.toString(distCounter) + " " + Double.toString(p1.vincentyDistance(p)));
+//                    Log.i(TAG, "Completed dist " + Double.toString(distCounter) + " " + Double.toString(p1.vincentyDistance(p)));
                     completedDist = distCounter + p1.vincentyDistance(p);
                 }
                 distCounter += p1.vincentyDistance(p2);
@@ -309,11 +314,203 @@ public class MainActivity extends Activity implements LocationListener {
         });
     }
 
+    void downloadGpx(String url, String code) {
+        DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+        //Set whether this download may proceed over a roaming connection.
+        request.setAllowedOverRoaming(true);
+        //Set the title of this download, to be displayed in notifications (if enabled).
+        request.setTitle("Gpx file download");
+        //Set a description of this download, to be displayed in notifications (if enabled)
+        request.setDescription("");
+        //Set the local destination for the downloaded file to a path within the application's external files directory
+        String tmpName = code + ".gpx";
+        File target = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), tmpName);
+
+        if (target.exists())
+            target.delete();
+        request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, tmpName);
+        long id = downloadManager.enqueue(request);
+        downloadingDialog(id, null);
+    }
+
+    void downloadTrackExplanation() {
+        LayoutInflater layoutInflater =
+                (LayoutInflater)getBaseContext()
+                        .getSystemService(LAYOUT_INFLATER_SERVICE);
+        View popupView = layoutInflater.inflate(R.layout.categorypopup, null);
+        final PopupWindow popupWindow = new PopupWindow(
+                popupView, WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setFocusable(true);
+        ListView listView = (ListView)popupView.findViewById(R.id.categories);
+        String[] elems = new String[]{"RWGPS.com", "Pastebin.com"};
+        ArrayAdapter<String> adapter =
+                new ArrayAdapter<String>(MainActivity.this,
+                        R.layout.categoryelem, elems);
+        listView.setAdapter(adapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                switch (i) {
+                    case 0:
+                        downloadTrackMenu(elems[i], "https://ridewithgps.com/routes/", ".gpx?sub_format=track");
+                        break;
+                    case 1:
+                        downloadTrackMenu(elems[i], "https://pastebin.com/", "");
+                        break;
+                }
+                popupWindow.dismiss();
+            }
+        });
+        popupWindow.showAsDropDown(mapView, 50, -30);
+//        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+//        TextView myMsg = new TextView(this);
+//        myMsg.setText("Upload your track to pastebin.com and enter the code from the URL after the /");
+//        myMsg.setGravity(Gravity.CENTER_HORIZONTAL);
+//        myMsg.setTextSize(14);
+//        //set custom title
+//        builder.setCustomTitle(myMsg);
+//
+//// Set up the buttons
+//        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+//            @Override
+//            public void onClick(DialogInterface dialog, int which) {
+//            }
+//        });
+//        builder.show();
+    }
+
+    HashMap<Long, AlertDialog> downloadDialogs = new HashMap<>();
+    private final ExecutorService executor = Executors.newFixedThreadPool(1);
+    void downloadingDialog(long downloadId, DownloadInfo mapDownload) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        TextView myMsg = new TextView(this);
+        myMsg.setText("Downloading file");
+        myMsg.setGravity(Gravity.CENTER_HORIZONTAL);
+        myMsg.setTextSize(14);
+        //set custom title
+        builder.setCustomTitle(myMsg);
+
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+                downloadManager.remove(downloadId);
+                if (mapDownload != null) {
+                    mapDownload.setStatus(MapDownloadStatus.ABSENT);
+                    mapDownloadsAdapter.notifyDataSetChanged();
+                }
+            }
+        });
+        if (mapDownload != null)
+            builder.setPositiveButton("Background", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    downloadDialogs.remove(downloadId);
+                }
+            });
+        builder.setMessage("0%");
+        AlertDialog dialog = builder.show();
+        downloadDialogs.put(downloadId, dialog);
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                boolean isDownloadFinished = false;
+                while (!isDownloadFinished && dialog.isShowing()) {
+                    DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
+                    Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(downloadId));
+                    String progress = "";
+                    if (cursor.moveToFirst()) {
+                        int downloadStatus = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                        switch (downloadStatus) {
+                            case DownloadManager.STATUS_RUNNING:
+                                long totalBytes = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                                if (totalBytes > 0) {
+                                    long downloadedBytes = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            dialog.setMessage((int) (downloadedBytes * 100 / totalBytes) + "% of "
+                                                    + totalBytes + " bytes");
+                                        }
+                                    });
+                                }
+
+                                break;
+                            case DownloadManager.STATUS_PAUSED:
+                            case DownloadManager.STATUS_PENDING:
+                                break;
+                            case DownloadManager.STATUS_SUCCESSFUL:
+                            case DownloadManager.STATUS_FAILED:
+                                isDownloadFinished = true;
+                                break;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    void chooseGpxSite() {
+
+    }
+
+    void downloadTrackMenu(String siteName, String url, String suffix) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Enter " + siteName + " code:");
+        final EditText input = new EditText(this);
+// Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+// Set up the buttons
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String code = input.getText().toString();
+                downloadGpx(url + code + suffix, code);
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+        builder.show();
+    }
+
+    void trackClick(int button) {
+        multiMenu(Arrays.asList("Activate", "Erase"), Arrays.asList(new Runnable() {
+            @Override
+            public void run() {
+                currentTrack = tracks.get(button);
+//                popupWindow.dismiss();
+                reloadLayers();
+            }
+        }, new Runnable() {
+            @Override
+            public void run() {
+                confirmationDialog("Erase this track?", new Runnable() {
+                    @Override
+                    public void run() {
+                        Track toRemove = tracks.get(button);
+                        if (currentTrack == toRemove) {
+                            currentTrack = null;
+                            reloadLayers();
+                        }
+                        toRemove.file.delete();
+                        tracks.remove(button);
+                        tracksMenu();
+                    }
+                });
+            }
+        }));
+    }
+
     void tracksMenu() {
-        if (tracks.isEmpty()) {
-            confirmationDialog("To import a track, click on a GPX file and open it with this app.", null);
-            return;
-        }
         View popupView = ((LayoutInflater)getBaseContext()
                 .getSystemService(LAYOUT_INFLATER_SERVICE)).inflate(R.layout.categorypopup, null);
         final PopupWindow popupWindow = new PopupWindow(
@@ -322,6 +519,7 @@ public class MainActivity extends Activity implements LocationListener {
         popupWindow.setFocusable(true);
         ListView listView = (ListView)popupView.findViewById(R.id.categories);
         List<String> elems = new ArrayList<>();
+        elems.add("<Download track>");
         for (Track t : tracks)
             elems.add(t.name);
         ArrayAdapter<String> adapter =
@@ -331,31 +529,12 @@ public class MainActivity extends Activity implements LocationListener {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int button, long l) {
-                multiMenu(Arrays.asList("Activate", "Erase"), Arrays.asList(new Runnable() {
-                    @Override
-                    public void run() {
-                        currentTrack = tracks.get(button);
-                        popupWindow.dismiss();
-                        reloadLayers();
-                    }
-                }, new Runnable() {
-                    @Override
-                    public void run() {
-                        confirmationDialog("Erase this track?", new Runnable() {
-                            @Override
-                            public void run() {
-                                Track toRemove = tracks.get(button);
-                                if (currentTrack == toRemove) {
-                                    currentTrack = null;
-                                    reloadLayers();
-                                }
-                                toRemove.file.delete();
-                                tracks.remove(button);
-                                popupWindow.dismiss();
-                            }
-                        });
-                    }
-                }));
+                if (button > 0) {
+                    trackClick(button - 1);
+                }
+                else
+                    downloadTrackExplanation();
+                popupWindow.dismiss();
             }
         });
         popupWindow.showAsDropDown(mapView, 50, -30);
@@ -426,7 +605,6 @@ public class MainActivity extends Activity implements LocationListener {
     public enum MapDownloadStatus {
         ABSENT,
         READY,
-        FETCHING,
         ERROR
     }
     private class DownloadInfo {
@@ -451,18 +629,28 @@ public class MainActivity extends Activity implements LocationListener {
             return new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), getTmpName());
         }
 
+        public long downloadId = 0;
+        public boolean isFetching() {
+            return downloadId != 0;
+        }
+
         @NonNull
         public String toString() {
+            if (isFetching())
+                return name + " (fetching)";
             switch (status) {
                 case ABSENT: return name;
                 case ERROR: return name + " (error downloading)";
                 case READY: return name + " (ready)";
-                case FETCHING: return name + " (fetching)";
             }
             return name;
         }
 
-        MapDownloadStatus status = MapDownloadStatus.ABSENT;
+        private MapDownloadStatus status = MapDownloadStatus.ABSENT;
+        void setStatus(MapDownloadStatus status) {
+            downloadId = 0;
+            this.status = status;
+        }
         String name;
         String url;
         int size;
@@ -782,7 +970,7 @@ public class MainActivity extends Activity implements LocationListener {
         DownloadInfo[] chosenMaps = allMaps.get(group);
         for (int i = 0; i < chosenMaps.length; ++i) {
             if (chosenMaps[i].getDownloadedPath().exists()) {
-                chosenMaps[i].status = MapDownloadStatus.READY;
+                chosenMaps[i].setStatus(MapDownloadStatus.READY);
             }
         }
         DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
@@ -794,7 +982,7 @@ public class MainActivity extends Activity implements LocationListener {
                 long id = cursor.getLong(cursor.getColumnIndex(DownloadManager.COLUMN_ID));
                 for (int i = 0; i < chosenMaps.length; ++i)
                     if (chosenMaps[i].url.equals(uri)) {
-                        chosenMaps[i].status = MapDownloadStatus.FETCHING;
+                        chosenMaps[i].downloadId = id;
                     }
             } while (cursor.moveToNext());
         }
@@ -804,10 +992,8 @@ public class MainActivity extends Activity implements LocationListener {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                if (chosenMaps[i].status == MapDownloadStatus.FETCHING) {
-                    Intent intent = new Intent();
-                    intent.setAction(DownloadManager.ACTION_VIEW_DOWNLOADS);
-                    startActivity(intent);
+                if (chosenMaps[i].isFetching()) {
+                    downloadingDialog(chosenMaps[i].downloadId, chosenMaps[i]);
                 } else
                 if (chosenMaps[i].status == MapDownloadStatus.READY) {
                     multiMenu(Arrays.asList("Erase file"), Arrays.asList(new Runnable() {
@@ -886,43 +1072,53 @@ public class MainActivity extends Activity implements LocationListener {
         if (target.exists())
             target.delete();
         request.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, map.getTmpName());
-        downloadManager.enqueue(request);
-        map.status = MapDownloadStatus.FETCHING;
-        //Enqueue a new download and same the referenceId
-        //downloadReference = downloadManager.enqueue(request);
+        map.downloadId = downloadManager.enqueue(request);;
+        downloadingDialog(map.downloadId, map);
     }
 
     private BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             Long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, 0);
+            AlertDialog dialog = downloadDialogs.get(downloadId);
+            if (dialog != null) {
+                dialog.hide();
+                downloadDialogs.remove(downloadId);
+            }
             Log.i(TAG,"Checking download status for id: " + downloadId);
             DownloadManager downloadManager = (DownloadManager)getSystemService(DOWNLOAD_SERVICE);
             Cursor cursor = downloadManager.query(new DownloadManager.Query().setFilterById(downloadId));
-
             if (cursor.moveToFirst()) {
-                String path = Uri.parse(cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI))).getPath();
-                File file = new File(path);
-                MapIndex mapIndex = getMapIndex(file.getName());
-                DownloadInfo map = getMap(mapIndex);
                 int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
                 if (status == DownloadManager.STATUS_FAILED) {
-                    map.status = MapDownloadStatus.ERROR;
-                    mapDownloadsAdapter.notifyDataSetChanged();
+                    Toast.makeText(MainActivity.this, "Download failed.", Toast.LENGTH_SHORT).show();
+                    return;
                 }
-                if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                    file.renameTo(map.getDownloadedPath());
+                Uri uri = Uri.parse(cursor.getString(cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)));
+                String path = uri.getPath();
+                String fileExt = MimeTypeMap.getFileExtensionFromUrl(path);
+                File file = new File(path);
+                if (fileExt.equals("tmp")) {
+                    MapIndex mapIndex = getMapIndex(file.getName());
+                    DownloadInfo map = getMap(mapIndex);
+                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                        file.renameTo(map.getDownloadedPath());
 //                    Log.i(TAG, "Downloaded map:" + allMaps[mapIndex].name);
 //                    Toast.makeText(MainActivity.this, "Download is ready: " + allMaps[mapIndex].name, Toast.LENGTH_SHORT).show();
-                    map.status = MapDownloadStatus.READY;
-                    mapDownloadsAdapter.notifyDataSetChanged();
+                        map.setStatus(MapDownloadStatus.READY);
+                        mapDownloadsAdapter.notifyDataSetChanged();
+                        reloadLayers();
+                    }
+                } else if (fileExt.equals("gpx")) {
                     reloadLayers();
+                    tracksMenu();
                 }
             }
+            cursor.close();
         }
     };
 
-    private BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+    private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             int level = intent.getIntExtra("level", 0);
@@ -930,8 +1126,6 @@ public class MainActivity extends Activity implements LocationListener {
             view.setText(Integer.toString(level) + "%");
         }
     };
-
-    private List<PoiPersistenceManager> persistenceManager = new ArrayList<>();
 
     File getAssetFile(String path) {
         try {
@@ -979,7 +1173,15 @@ public class MainActivity extends Activity implements LocationListener {
         for (File f : dir.listFiles()) {
             if (f.getName().endsWith(".gpx")) {
                 Log.i(TAG, "Found GPX file: " + f.getAbsolutePath());
-                tracks.add(new Track(f.getName().substring(0, f.getName().length() - 4), f, decodeGPX(f)));
+                try {
+                    GPXData data = decodeGPX(f);
+                    String name = data.name;
+                    if (name == null)
+                        name = f.getName().substring(0, f.getName().length() - 4);
+                    tracks.add(new Track(name, f, data.points));
+                } catch (Exception e) {
+                    Log.e(TAG, e.toString());
+                }
             }
         }
     }
@@ -1145,32 +1347,40 @@ public class MainActivity extends Activity implements LocationListener {
         layers.add(polyline);
     }
 
-    private List<LatLong> decodeGPX(File file){
+    class GPXData {
+        List<LatLong> points;
+        String name;
+
+        public GPXData(List<LatLong> points, String name) {
+            this.points = points;
+            this.name = name;
+        }
+    }
+    private GPXData decodeGPX(File file) throws IOException, SAXException, ParserConfigurationException {
         List<LatLong> list = new ArrayList<LatLong>();
 
         DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-        try {
-            DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
-            Document document = documentBuilder.parse(file);
-            Element elementRoot = document.getDocumentElement();
+        DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+        Document document = documentBuilder.parse(file);
+        Element elementRoot = document.getDocumentElement();
+        NodeList nameList = elementRoot.getElementsByTagName("name");
+        String name = null;
+        if (nameList.getLength() > 0)
+            name = nameList.item(0).getFirstChild().getNodeValue();
+        NodeList nodelist_trkpt = elementRoot.getElementsByTagName("trkpt");
 
-            NodeList nodelist_trkpt = elementRoot.getElementsByTagName("trkpt");
+        for(int i = 0; i < nodelist_trkpt.getLength(); i++){
+            Node node = nodelist_trkpt.item(i);
+            NamedNodeMap attributes = node.getAttributes();
 
-            for(int i = 0; i < nodelist_trkpt.getLength(); i++){
-                Node node = nodelist_trkpt.item(i);
-                NamedNodeMap attributes = node.getAttributes();
+            String newLatitude = attributes.getNamedItem("lat").getTextContent();
+            Double newLatitude_double = Double.parseDouble(newLatitude);
 
-                String newLatitude = attributes.getNamedItem("lat").getTextContent();
-                Double newLatitude_double = Double.parseDouble(newLatitude);
-
-                String newLongitude = attributes.getNamedItem("lon").getTextContent();
-                Double newLongitude_double = Double.parseDouble(newLongitude);
-                list.add(new LatLong(newLatitude_double, newLongitude_double));
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            String newLongitude = attributes.getNamedItem("lon").getTextContent();
+            Double newLongitude_double = Double.parseDouble(newLongitude);
+            list.add(new LatLong(newLatitude_double, newLongitude_double));
         }
-        return list;
+        return new GPXData(list, name);
     }
 
     private void createTileCaches() {
@@ -1217,8 +1427,6 @@ public class MainActivity extends Activity implements LocationListener {
     protected void onDestroy() {
         mapView.destroyAll();
         AndroidGraphicFactory.clearResourceMemoryCache();
-        for (PoiPersistenceManager elem : persistenceManager)
-            elem.close();
         super.onDestroy();
     }
 
@@ -1241,17 +1449,11 @@ public class MainActivity extends Activity implements LocationListener {
     }
 
     private String queryName(Uri uri) {
-        Cursor returnCursor = getContentResolver().query(uri, null, null, null, null);
-        assert returnCursor != null;
-        int nameIndex = returnCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-        returnCursor.moveToFirst();
-        String name = returnCursor.getString(nameIndex);
-        returnCursor.close();
-        return name;
+        File file = new File(uri.getPath());
+        return file.getName();
     }
 
-    private void tryImportingTrack(Intent intent) {
-        Uri data = intent.getData();
+    private void tryImportingTrack(Uri data) {
         if (data != null) {
             String path = data.getEncodedPath();
             String name = queryName(data);
@@ -1279,7 +1481,7 @@ public class MainActivity extends Activity implements LocationListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        tryImportingTrack(getIntent());
+        tryImportingTrack(getIntent().getData());
         AndroidGraphicFactory.createInstance(this);
         this.preferencesFacade = new AndroidPreferences(this.getSharedPreferences(getPersistableId(), MODE_PRIVATE));
         createMapViews();
