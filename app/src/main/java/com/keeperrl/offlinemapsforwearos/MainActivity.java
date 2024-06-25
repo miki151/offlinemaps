@@ -203,11 +203,10 @@ public class MainActivity extends Activity implements LocationListener {
         this.myLocationOverlay.setPosition(location.getLatitude(), location.getLongitude(), location.getAccuracy());
         lastLocation = location;
         ImageButton button = (ImageButton) findViewById(R.id.locationButton);
-        if (lockedLocation) {
+        if (isLockedLocation()) {
             setLocation(location);
-            button.setBackgroundColor(getResources().getColor(R.color.blue));
-        } else
-            button.setBackgroundColor(getResources().getColor(R.color.translucent));
+        }
+        button.setBackgroundColor(getResources().getColor(lockedLocation == Long.MAX_VALUE ? R.color.translucent : R.color.blue));
         if (currentTrack != null) {
             LatLong myPos = new LatLong(location.getLatitude(), location.getLongitude());
             double latLongMult = getLatLongMult(myPos);
@@ -252,7 +251,10 @@ public class MainActivity extends Activity implements LocationListener {
         toggleView(findViewById(R.id.trackOverlay));
     }
 
-    private boolean lockedLocation = false;
+    private long lockedLocation = Long.MIN_VALUE;
+    private boolean isLockedLocation() {
+        return lockedLocation < System.currentTimeMillis() - 2000;
+    }
     private boolean displayOn = false;
     private Long timerStart = null;
 
@@ -291,10 +293,16 @@ public class MainActivity extends Activity implements LocationListener {
         locationButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                lockedLocation = true;
-                if (lastLocation != null) {
-                    locationButton.setBackgroundColor(getResources().getColor(R.color.blue));
-                    setLocation(lastLocation);
+                if (!isLockedLocation()) {
+                    lockedLocation = Long.MIN_VALUE;
+                    if (lastLocation != null) {
+                        locationButton.setBackgroundColor(getResources().getColor(R.color.blue));
+                        setLocation(lastLocation);
+                    }
+                } else {
+                    lockedLocation = Long.MAX_VALUE;
+                    ImageButton button = (ImageButton) findViewById(R.id.locationButton);
+                    button.setBackgroundColor(getResources().getColor(R.color.translucent));
                 }
             }
         });
@@ -1259,11 +1267,8 @@ public class MainActivity extends Activity implements LocationListener {
         mapView.addInputListener(new InputListener() {
             @Override
             public void onMoveEvent() {
-                lockedLocation = false;
-                if (lastLocation != null) {
-                    ImageButton button = (ImageButton) findViewById(R.id.locationButton);
-                    button.setBackgroundColor(getResources().getColor(R.color.translucent));
-                }
+                if (isLockedLocation())
+                    lockedLocation = System.currentTimeMillis();
             }
             @Override
             public void onZoomEvent() {
