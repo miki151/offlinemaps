@@ -47,6 +47,8 @@
             android:paddingHorizontal="5sp"
             android:shadowColor="@color/white"
             android:text="00:00"
+        android:visibility="invisible"
+        android:height="2sp"
             android:textColor="@color/white"
             android:textSize="28sp" />
 
