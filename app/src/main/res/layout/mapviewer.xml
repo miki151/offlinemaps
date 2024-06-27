@@ -16,9 +16,7 @@
         android:layout_alignParentBottom="false"
         android:layout_centerHorizontal="false"
         android:layout_centerVertical="true"
-        android:layout_marginBottom="4dp"
-        android:scaleX="0.8"
-        android:scaleY="0.8"
+
         android:background="@color/red"
         android:src="@drawable/ic_action_location_2" />
 
@@ -27,8 +25,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="top|center_horizontal"
-        android:orientation="vertical"
-        android:visibility="invisible">
+        android:orientation="vertical">
 
     <LinearLayout
         android:id="@+id/timerOverlayInside"
@@ -48,7 +45,7 @@
             android:shadowColor="@color/white"
             android:text="00:00"
         android:visibility="invisible"
-        android:height="2sp"
+        android:height="5sp"
             android:textColor="@color/white"
             android:textSize="28sp" />
 
@@ -56,6 +53,7 @@
             android:id="@+id/timerOverlayUnder"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@color/translucent"
             android:orientation="horizontal">
 
             <TextClock
@@ -64,8 +62,10 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_horizontal"
                 android:layout_weight="1"
+                android:width="90sp"
                 android:shadowColor="@color/white"
-                android:text="00:00"
+                android:format24Hour="hh:mm"
+                android:format12Hour="kk:mm"
                 android:textColor="@color/white"
                 android:textSize="14sp" />
 
@@ -130,9 +130,17 @@
         android:layout_centerHorizontal="false"
         android:layout_centerVertical="true"
         android:layout_marginBottom="4dp"
-        android:scaleX="0.8"
-        android:scaleY="0.8"
         android:background="@color/translucent"
         android:src="@drawable/ic_action_sun" />
+    <ImageButton
+        android:id="@+id/infoButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="false"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="false"
+        android:layout_marginBottom="4dp"
+        android:background="@color/translucent"
+        android:src="@drawable/ic_action_info" />
 
 </RelativeLayout>

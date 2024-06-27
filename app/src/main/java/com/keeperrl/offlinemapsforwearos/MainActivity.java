@@ -235,7 +235,10 @@ public class MainActivity extends Activity implements LocationListener {
             distanceLabel.setText(df.format(completedDist / 1000) + " km");
             TextView distanceTotalLabel = (TextView) findViewById(R.id.distanceTotalLabel);
             distanceTotalLabel.setText(df.format(currentTrack.length / 1000) + " km");
-        }
+            if (findViewById(R.id.timerOverlay).getVisibility() == View.VISIBLE)
+                findViewById(R.id.trackOverlay).setVisibility(View.VISIBLE);
+        } else
+            findViewById(R.id.trackOverlay).setVisibility(View.GONE);
     }
 
     private void toggleView(View view) {
@@ -247,8 +250,12 @@ public class MainActivity extends Activity implements LocationListener {
 
     @Override
     public void onBackPressed() {
-        toggleView(findViewById(R.id.timerOverlay));
-        toggleView(findViewById(R.id.trackOverlay));
+        MapView mapView = findViewById(R.id.mapView);
+        boolean state = !mapView.isClickable();
+        mapView.setClickable(state);
+        findViewById(R.id.locationButton).setClickable(state);
+        findViewById(R.id.displayButton).setClickable(state);
+        findViewById(R.id.infoButton).setClickable(state);
     }
 
     private long lockedLocation = Long.MIN_VALUE;
@@ -289,7 +296,7 @@ public class MainActivity extends Activity implements LocationListener {
                     timerStart = null;
             }
         });
-        ImageButton locationButton = (ImageButton) findViewById(R.id.locationButton);
+        ImageButton locationButton = findViewById(R.id.locationButton);
         locationButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -306,6 +313,17 @@ public class MainActivity extends Activity implements LocationListener {
                 }
             }
         });
+        ImageButton infoButton = findViewById(R.id.infoButton);
+        infoButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleView(findViewById(R.id.timerOverlay));
+                toggleView(findViewById(R.id.trackOverlay));
+                if (currentTrack == null)
+                    findViewById(R.id.trackOverlay).setVisibility(View.GONE);
+            }
+        });
+
         ImageButton displayButton = (ImageButton) findViewById(R.id.displayButton);
         displayButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1440,7 +1458,7 @@ public class MainActivity extends Activity implements LocationListener {
 
     private MapView getMapView() {
         setContentView(R.layout.mapviewer);
-        return (MapView) findViewById(R.id.mapView);
+        return findViewById(R.id.mapView);
     }
 
     private void createMapViews() {
