@@ -20,3 +20,5 @@ Instructions:
 * Click on the "info" icon on the top to toggle the information overlay (clock, battery and track progress).
 * Click on the "location" icon on the right to stop the map from centering on your location.
 * Press the back button to disable/enable touch input (a "lock" icon will appear on the right when touch is disabled).
+
+This app was made thanks to the awesome Mapsforge library: https://github.com/mapsforge/mapsforge
