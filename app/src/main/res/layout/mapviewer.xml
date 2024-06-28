@@ -19,6 +19,21 @@
 
         android:background="@color/red"
         android:src="@drawable/ic_action_location_2" />
+    <ImageButton
+        android:id="@+id/screenLockButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignRight="@id/mapView"
+        android:layout_marginRight="8sp"
+        android:visibility="gone"
+        android:layout_marginTop="29sp"
+        android:layout_alignParentBottom="false"
+        android:layout_centerHorizontal="false"
+        android:layout_centerVertical="true"
+        android:layout_alignTop="@+id/locationButton"
+
+        android:background="@color/blue"
+        android:src="@drawable/ic_action_lock" />
 
     <LinearLayout
         android:id="@+id/timerOverlay"

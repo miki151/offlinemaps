@@ -3,12 +3,12 @@ plugins {
 }
 
 android {
-    compileSdk 30
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.keeperrl.offlinemapsforwearos"
         minSdk 30
-        targetSdk 30
+        targetSdk 33
         versionCode 1
         versionName "1.0"
 
@@ -23,6 +23,7 @@ android {
     buildFeatures {
         viewBinding true
     }
+    namespace 'com.keeperrl.offlinemapsforwearos'
 }
 
 dependencies {

@@ -256,6 +256,7 @@ public class MainActivity extends Activity implements LocationListener {
         findViewById(R.id.locationButton).setClickable(state);
         findViewById(R.id.displayButton).setClickable(state);
         findViewById(R.id.infoButton).setClickable(state);
+        toggleView(findViewById(R.id.screenLockButton));
     }
 
     private long lockedLocation = Long.MIN_VALUE;
@@ -381,10 +382,11 @@ public class MainActivity extends Activity implements LocationListener {
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 switch (i) {
                     case 0:
-                        downloadTrackMenu(elems[i], "https://ridewithgps.com/routes/", ".gpx?sub_format=track");
+                        downloadTrackMenu("Enter 8-digits from track URL:", "https://ridewithgps.com/routes/", ".gpx?sub_format=track",
+                                InputType.TYPE_CLASS_NUMBER);
                         break;
                     case 1:
-                        downloadTrackMenu(elems[i], "https://pastebin.com/", "");
+                        downloadTrackMenu("Enter last 8 letters from the URL.", "https://pastebin.com/", "", InputType.TYPE_CLASS_TEXT);
                         break;
                 }
                 popupWindow.dismiss();
@@ -483,12 +485,12 @@ public class MainActivity extends Activity implements LocationListener {
 
     }
 
-    void downloadTrackMenu(String siteName, String url, String suffix) {
+    void downloadTrackMenu(String message, String url, String suffix, int inputType) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Enter " + siteName + " code:");
+        builder.setTitle(message);
         final EditText input = new EditText(this);
 // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setInputType(inputType);
         builder.setView(input);
 
 // Set up the buttons
@@ -576,8 +578,8 @@ public class MainActivity extends Activity implements LocationListener {
 
         popupWindow.setOutsideTouchable(true);
         popupWindow.setFocusable(true);
-        ListView listView = (ListView)popupView.findViewById(R.id.categories);
-        String[] elems = new String[]{"Tracks", "Download maps", "Settings"};
+        ListView listView = popupView.findViewById(R.id.categories);
+        String[] elems = new String[]{"GPX Tracks", "Offline Maps"};
         ArrayAdapter<String> adapter =
                 new ArrayAdapter<String>(MainActivity.this,
                         R.layout.categoryelem, elems);
@@ -592,8 +594,6 @@ public class MainActivity extends Activity implements LocationListener {
                         break;
                     case 1:
                         chooseMapGroupAction();
-                        break;
-                    case 2:
                         break;
                     default:
                         throw new RuntimeException("Unknown menu item: " + Integer.toString(i));
